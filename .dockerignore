@@ -1,0 +1,13 @@
+# Ignorar archivos locales y de credenciales al construir la imagen
+.git
+.github
+.gitignore
+README.md
+docker-compose.yml
+*.md
+*.log
+node_modules
+.DS_Store
+Thumbs.db
+.vscode
+.idea

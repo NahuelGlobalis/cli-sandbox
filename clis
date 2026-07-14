@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE="clis-code:latest"
+
+# --- Verificar que la imagen existe ---
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "Error: la imagen '$IMAGE' no existe." >&2
+    echo "Creala con:  docker build -t $IMAGE ." >&2
+    exit 1
+fi
+
+# --- Construir argumentos de docker run ---
+DOCKER_ARGS=(
+    run -it --rm --init
+    -v /var/run/docker.sock:/var/run/docker.sock
+    -v "$HOME/.clis-code/home":/home/dev
+    -v "$PWD":/home/dev/projects
+    -w /home/dev/projects
+    -v "$HOME/.ssh":/home/dev/.ssh:ro
+)
+
+# --- SSH agent forwarding (si el agent está activo en el host) ---
+if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
+    DOCKER_ARGS+=(
+        -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock
+        -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock
+    )
+fi
+
+# --- Parsear flags del script: --port/-p, --env/-e ---
+CMD_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --port|-p)
+            DOCKER_ARGS+=("-p" "$2")
+            shift 2
+            ;;
+        --env|-e)
+            DOCKER_ARGS+=("-e" "$2")
+            shift 2
+            ;;
+        *)
+            CMD_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+    docker "${DOCKER_ARGS[@]}" "$IMAGE" "${CMD_ARGS[@]}"
+else
+    docker "${DOCKER_ARGS[@]}" "$IMAGE"
+fi

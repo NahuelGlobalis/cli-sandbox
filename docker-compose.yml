@@ -1,0 +1,45 @@
+services:
+  clis-code:
+    # La imagen contiene Google Chrome y CLIs que solo distribuyen amd64.
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        IMAGE_VERSION: ${IMAGE_VERSION:-dev}
+    image: clis-code:latest
+    container_name: clis-code
+    # Manejo correcto de señales (Ctrl+C, zombies)
+    init: true
+    # Reiniciar a menos que se haya detenido manualmente
+    restart: unless-stopped
+    # Modo interactivo por defecto
+    stdin_open: true
+    tty: true
+    # Antigravity puede requerir seccomp:unconfined y SYS_PTRACE en algunos
+    # entornos. No se habilitan por defecto; añádelos solo si agy falla.
+    environment:
+      - HOME=/home/dev
+      - XDG_DATA_HOME=/home/dev/.local/share
+      - TZ=UTC
+      # Git: identidad (sobreescribe .gitconfig del host sin modificarlo)
+      - GIT_AUTHOR_NAME=nahuel.cano
+      - GIT_AUTHOR_EMAIL=nahuelcano@gmail.com
+      - GIT_COMMITTER_NAME=nahuel.cano
+      - GIT_COMMITTER_EMAIL=nahuelcano@gmail.com
+    volumes:
+      # Docker: montar el socket del host para usar el daemon desde dentro
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Home completo: un solo volume persiste configs, credenciales, cache y estado
+      # de todas las CLIs. El entrypoint sincroniza el skeleton en el primer arranque.
+      - ${HOME}/.clis-code/home:/home/dev
+      # Git y SSH: compartir configuración y credenciales del host en modo lectura.
+      - ${HOME}/.gitconfig:/home/dev/.gitconfig:ro
+      - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
+      - ${HOME}/.ssh:/home/dev/.ssh:ro
+      # Proyectos de trabajo
+      - ${HOME}/.clis-code/projects:/home/dev/projects
+    # Si necesitas exponer puertos (por ejemplo, para el modo web de alguna CLI)
+    # ports:
+    #   - "3000:3000"
+    command: ["/bin/bash"]

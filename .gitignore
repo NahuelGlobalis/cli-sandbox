@@ -1,0 +1,21 @@
+# Credenciales y configuración local de las CLIs
+/.clis-code/
+.clis-code/**/*.json
+.clis-code/**/*.toml
+*.enc
+*.token
+
+# Environment files con secrets
+*.env
+.env*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
