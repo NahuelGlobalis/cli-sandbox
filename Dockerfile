@@ -9,13 +9,14 @@ ARG PLAYWRIGHT_VERSION=1.52.0
 ARG UV_VERSION=0.11.24
 ARG PYTHON_VERSION=3.12
 ARG OPENCODE_VERSION=1.16.2
+ARG CODEX_VERSION=0.145.0
 
 # Las CLIs propietarias y Google Chrome se distribuyen para amd64.
 RUN test "${TARGETARCH}" = "amd64" \
     || (echo "Esta imagen solo admite linux/amd64" >&2 && exit 1)
 
 LABEL org.opencontainers.image.title="clis-code" \
-      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Antigravity, OpenCode) + Chrome/Playwright + Docker CLI" \
+      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Antigravity, OpenCode, Codex) + Chrome/Playwright + Docker CLI" \
       org.opencontainers.image.source="https://github.com/nahue/clis-code" \
       org.opencontainers.image.authors="nahue" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
@@ -141,6 +142,9 @@ RUN pnpm add -g --ignore-scripts "opencode-ai@${OPENCODE_VERSION}" \
     && test -f "${OPENCODE_DIR}/postinstall.mjs" \
     && node "${OPENCODE_DIR}/postinstall.mjs"
 
+# Codex CLI de OpenAI.
+RUN pnpm add -g "@openai/codex@${CODEX_VERSION}"
+
 # Playwright global y navegador Chromium.
 RUN pnpm add -g "playwright@${PLAYWRIGHT_VERSION}" \
     && playwright install chromium
@@ -172,6 +176,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD command -v devin \
     && command -v agy \
     && command -v opencode \
+    && command -v codex \
     && command -v uv \
     && command -v pnpm \
     && command -v playwright \
@@ -182,31 +187,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
 # --- 10. Entrypoint ---
 # Arranca como root para sincronizar el skeleton, ajustar permisos del socket
 # de Docker y luego baja privilegios a dev con gosu.
-COPY --chmod=0755 <<'EOF' /usr/local/bin/entrypoint.sh
-#!/bin/bash
-set -euo pipefail
-
-# Sincronizar skeleton → home (solo archivos/dirs que no existen).
-# Esto popula el volume vacío en el primer arranque.
-rsync -a --ignore-existing /home/dev-skel/ /home/dev/
-
-# Corregir ownership del home (ignora read-only bind mounts).
-chown -R dev:dev /home/dev 2>/dev/null || true
-
-# Si el socket de Docker está montado, asegurar que dev pueda acceder.
-if [[ -S /var/run/docker.sock ]]; then
-    SOCKET_GID="$(stat -c '%g' /var/run/docker.sock)"
-    if ! getent group docker >/dev/null 2>&1; then
-        groupadd -g "${SOCKET_GID}" docker
-    fi
-    if ! id dev | grep -q "docker"; then
-        usermod -aG docker dev
-    fi
-fi
-
-exec gosu dev "$@"
-EOF
-
 USER root
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]

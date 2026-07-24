@@ -1,0 +1,5 @@
+# Ensure shell scripts always use LF line endings
+*.sh text eol=lf
+clis text eol=lf
+entrypoint.sh text eol=lf
+Dockerfile text eol=lf
