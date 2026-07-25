@@ -25,10 +25,11 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 docker build -t clis-code:latest .
 ```
 
-Durante cada build, Herdr resuelve la última versión estable publicada en
-`https://herdr.dev/latest.json`. El manifest remoto forma parte de la clave de
-caché de Docker, por lo que una nueva release invalida automáticamente su capa
-de instalación; no se actualiza al ejecutar el contenedor.
+Durante cada build, Devin, Antigravity, OpenCode, Codex y Herdr resuelven su
+última versión estable. Sus manifests o metadatos remotos forman parte de la
+clave de caché de Docker, por lo que una nueva release invalida automáticamente
+la capa de instalación correspondiente. Las CLIs se actualizan al reconstruir
+la imagen, no al ejecutar el contenedor.
 
 ## Ejecutar el contenedor
 
@@ -321,10 +322,10 @@ El repositorio incluye dos workflows de GitHub Actions:
 - **Usuario:** la imagen corre con el usuario `dev` (uid 1000) para evitar escribir como root en tu host.
 - **Aislamiento:** los procesos se ejecutan como `dev` dentro del contenedor, pero los volúmenes montados siguen exponiendo datos del host.
 - **Persistencia:** un solo volume en `~/.clis-code/home` persiste todo el home. Las herramientas (binarios, navegadores, Python) viven en `/opt` y sobreviven a rebuilds. El entrypoint sincroniza un skeleton preconfigurado en el primer arranque.
-- **Actualizar CLIs:** reconstruye la imagen con `docker build --no-cache -t clis-code:latest .` o corre los comandos de upgrade dentro del contenedor.
+- **Actualizar CLIs:** reconstruye la imagen con `docker build -t clis-code:latest .`; las versiones remotas invalidan automáticamente las capas necesarias.
 - **Reducir tamaño:** si no necesitas Google Chrome, elimina el bloque de instalación de `google-chrome-stable` y su comprobación en el healthcheck.
 - **Arquitectura:** la imagen se construye y publica únicamente para `linux/amd64`.
-- **Versiones:** las herramientas con versión configurable usan argumentos `ARG` en el `Dockerfile`; los instaladores propietarios siguen dependiendo de sus scripts oficiales remotos.
+- **Versiones:** OpenCode y Codex usan `latest` por defecto mediante argumentos `ARG`; las CLIs propietarias se resuelven desde sus manifests oficiales.
 
 ## Troubleshooting
 

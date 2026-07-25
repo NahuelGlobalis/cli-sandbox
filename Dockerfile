@@ -8,8 +8,8 @@ ARG PNPM_VERSION=10.21.0
 ARG PLAYWRIGHT_VERSION=1.52.0
 ARG UV_VERSION=0.11.24
 ARG PYTHON_VERSION=3.12
-ARG OPENCODE_VERSION=1.16.2
-ARG CODEX_VERSION=0.145.0
+ARG OPENCODE_VERSION=latest
+ARG CODEX_VERSION=latest
 
 # Las CLIs propietarias y Google Chrome se distribuyen para amd64.
 RUN test "${TARGETARCH}" = "amd64" \
@@ -112,10 +112,12 @@ RUN git config --global user.email "nahuelcano@gmail.com" \
 RUN pnpm config set global-bin-dir /opt/pnpm-global/bin
 
 # Devin no debe guardar su binario dentro del directorio de credenciales montable.
+# El manifest remoto invalida la caché cuando se publica una versión nueva.
+ADD --chown=dev:dev https://static.devin.ai/cli/current/manifest.json /tmp/devin-latest.json
 RUN curl -fsSL https://cli.devin.ai/install.sh -o /tmp/devin-install.sh \
     && sed -i '/COMPILED_BIN_NAME" setup$/c\true # omitir la configuración durante la build' /tmp/devin-install.sh \
     && bash /tmp/devin-install.sh \
-    && rm -f /tmp/devin-install.sh
+    && rm -f /tmp/devin-install.sh /tmp/devin-latest.json
 
 # Mover el binario de Devin fuera del directorio de credenciales persistentes.
 USER root
@@ -132,20 +134,26 @@ RUN DEVIN_BIN="$(readlink -f /home/dev/.local/bin/devin)" \
 USER dev
 
 # Antigravity CLI: el binario se mueve a /opt para que sobreviva al volume del home.
+ADD --chown=dev:dev https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_amd64.json /tmp/antigravity-latest.json
 RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
     && mkdir -p /opt/antigravity/bin \
     && mv /home/dev/.local/bin/agy /opt/antigravity/bin/agy \
     && chmod +x /opt/antigravity/bin/agy \
-    && ln -sf /opt/antigravity/bin/agy /home/dev/.local/bin/agy
+    && ln -sf /opt/antigravity/bin/agy /home/dev/.local/bin/agy \
+    && rm -f /tmp/antigravity-latest.json
 
 # OpenCode: se desactivan los scripts automáticos para ejecutar postinstall una sola vez.
+ADD --chown=dev:dev https://registry.npmjs.org/opencode-ai/latest /tmp/opencode-latest.json
 RUN pnpm add -g --ignore-scripts "opencode-ai@${OPENCODE_VERSION}" \
     && OPENCODE_DIR="$(dirname "$(find /opt/pnpm-global -name "postinstall.mjs" -path "*opencode*" | head -1)")" \
     && test -f "${OPENCODE_DIR}/postinstall.mjs" \
-    && node "${OPENCODE_DIR}/postinstall.mjs"
+    && node "${OPENCODE_DIR}/postinstall.mjs" \
+    && rm -f /tmp/opencode-latest.json
 
 # Codex CLI de OpenAI.
-RUN pnpm add -g "@openai/codex@${CODEX_VERSION}"
+ADD --chown=dev:dev https://registry.npmjs.org/@openai%2Fcodex/latest /tmp/codex-latest.json
+RUN pnpm add -g "@openai/codex@${CODEX_VERSION}" \
+    && rm -f /tmp/codex-latest.json
 
 # Herdr: el binario vive en /opt para que el volume persistente del home no lo oculte.
 # La configuración queda en /home/dev/.config/herdr y se conserva con el resto del home.
