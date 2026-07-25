@@ -41,13 +41,14 @@ docker run -it --rm clis-code:latest
 
 ### Recomendado: persistir credenciales y proyectos
 
-La imagen usa un **único volume para todo el home** (`/home/dev`). Esto persiste automáticamente configs, credenciales, cache y estado de todas las CLIs, sin necesidad de enumerar paths individuales. El entrypoint sincroniza un skeleton preconfigurado en el primer arranque.
+La imagen usa un **volume principal para todo el home** (`/home/dev`). Esto persiste automáticamente configs, credenciales, cache y estado de todas las CLIs, sin necesidad de enumerar paths individuales. Las skills se comparten por separado con el host y el entrypoint sincroniza un skeleton preconfigurado en el primer arranque.
 
 ```powershell
 docker run -it --rm `
   -v "${PWD}:/home/dev/projects" `
   -w /home/dev/projects `
   -v "${env:USERPROFILE}\.clis-code\home:/home/dev" `
+  -v "${env:USERPROFILE}\.agents\skills:/home/dev/.agents/skills" `
   -v "${env:USERPROFILE}\.ssh:/home/dev/.ssh:ro" `
   clis-code:latest
 ```
@@ -59,6 +60,7 @@ docker run -it --rm \
   -v "$PWD":/home/dev/projects \
   -w /home/dev/projects \
   -v "$HOME/.clis-code/home":/home/dev \
+  -v "$HOME/.agents/skills":/home/dev/.agents/skills \
   -v "$HOME/.ssh":/home/dev/.ssh:ro \
   clis-code:latest
 ```
@@ -70,7 +72,7 @@ docker run -it --rm \
 
 ## Credenciales: cómo funciona la persistencia
 
-La imagen monta **un solo volume** en `/home/dev` que persiste todo el home del usuario `dev`:
+La imagen monta un volume principal en `/home/dev` que persiste todo el home del usuario `dev`:
 
 ```
 ~/.clis-code/home/          # → /home/dev (volume principal)
@@ -82,6 +84,10 @@ La imagen monta **un solo volume** en `/home/dev` que persiste todo el home del 
 ├── .gitconfig              # configuración de git (generada en el skeleton)
 └── projects/               # código de trabajo (se overlay con $PWD)
 ```
+
+Además, `~/.agents/skills` se monta en `/home/dev/.agents/skills` con lectura y
+escritura. Las skills instaladas o modificadas desde el host o el contenedor se
+comparten inmediatamente entre ambos.
 
 **Tools fuera del home (no se pierden al reconstruir):**
 
@@ -266,7 +272,7 @@ docker build -t clis-code:latest .
 
 El flag `--init` se pasa automáticamente a `docker run` para manejo correcto de señales (Ctrl+C, procesos zombie).
 
-El script monta `$PWD` como `/home/dev/projects` y un volume en `~/.clis-code/home` como `/home/dev` para persistir credenciales y configuración de todas las CLIs.
+El script monta `$PWD` como `/home/dev/projects`, persiste el home en `~/.clis-code/home` y comparte `~/.agents/skills` con `/home/dev/.agents/skills`.
 
 ## Docker Compose
 

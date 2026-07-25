@@ -30,9 +30,11 @@ services:
     volumes:
       # Docker: montar el socket del host para usar el daemon desde dentro
       - /var/run/docker.sock:/var/run/docker.sock
-      # Home completo: un solo volume persiste configs, credenciales, cache y estado
+      # Home completo: el volume principal persiste configs, credenciales, cache y estado
       # de todas las CLIs. El entrypoint sincroniza el skeleton en el primer arranque.
       - ${HOME}/.clis-code/home:/home/dev
+      # Skills compartidas con el host en lectura y escritura.
+      - ${HOME}/.agents/skills:/home/dev/.agents/skills
       # Git y SSH: compartir configuración y credenciales del host en modo lectura.
       - ${HOME}/.gitconfig:/home/dev/.gitconfig:ro
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
