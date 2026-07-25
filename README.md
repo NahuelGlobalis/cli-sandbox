@@ -1,4 +1,4 @@
-# Docker image para CLIs de codificación (Devin + Antigravity + OpenCode) + Chrome/Playwright
+# Docker image para CLIs de codificación (Devin + Antigravity + OpenCode + Codex + Herdr) + Chrome/Playwright
 
 Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más populares, listo para usar sin riesgos en el sistema host. También incluye Google Chrome y Chromium para Playwright.
 
@@ -7,6 +7,8 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 - **Devin CLI** (`devin`) – Cognition AI
 - **Antigravity CLI** (`agy`) – Google
 - **OpenCode CLI** (`opencode`) – Anomaly
+- **Codex CLI** (`codex`) – OpenAI
+- **Herdr** (`herdr`) – multiplexor de terminal para agentes
 - **pnpm** – gestor de paquetes Node.js
 - **uv** – gestor de Python y entornos
 - **Google Chrome** + **Chromium** para Playwright
@@ -22,6 +24,11 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 ```powershell
 docker build -t clis-code:latest .
 ```
+
+Durante cada build, Herdr resuelve la última versión estable publicada en
+`https://herdr.dev/latest.json`. El manifest remoto forma parte de la clave de
+caché de Docker, por lo que una nueva release invalida automáticamente su capa
+de instalación; no se actualiza al ejecutar el contenedor.
 
 ## Ejecutar el contenedor
 
@@ -66,7 +73,7 @@ La imagen monta **un solo volume** en `/home/dev` que persiste todo el home del 
 
 ```
 ~/.clis-code/home/          # → /home/dev (volume principal)
-├── .config/                # configs de Devin, OpenCode, etc.
+├── .config/                # configs de Devin, OpenCode, Herdr, etc.
 ├── .local/share/           # credenciales, sesiones, datos de uv
 ├── .local/state/           # estado de OpenCode
 ├── .cache/                 # cache de OpenCode, uv, etc.
@@ -81,6 +88,7 @@ La imagen monta **un solo volume** en `/home/dev` que persiste todo el home del 
 |---|---|---|
 | Devin | `/opt/devin/` | Binario separado de credenciales |
 | Antigravity | `/opt/antigravity/bin/` | Binario fuera del volume |
+| Herdr | `/opt/herdr/bin/` | Binario fuera del volume; config en el home |
 | pnpm global | `/opt/pnpm-global/` | OpenCode, Playwright |
 | Playwright browsers | `/opt/playwright-browsers/` | Chromium |
 | Python (uv) | `/opt/uv/python/` | Interprete fuera del volume |
@@ -118,6 +126,34 @@ opencode auth login
 ```
 
 O configura providers directamente con `/connect` dentro de la TUI.
+
+## Usar Herdr
+
+Inicia Herdr desde cualquier proyecto:
+
+```bash
+herdr
+```
+
+Su configuración se guarda en `/home/dev/.config/herdr/config.toml` mediante
+`HERDR_CONFIG_PATH`. Como `/home/dev` está montado en
+`~/.clis-code/home`, los ajustes, plugins e integraciones sobreviven a la
+recreación del contenedor.
+
+Para generar una configuración completa como punto de partida:
+
+```bash
+herdr --default-config > "${HERDR_CONFIG_PATH}"
+```
+
+Herdr detecta los agentes instalados. Las integraciones opcionales agregan
+estado y restauración de sesiones cuando el agente lo admite:
+
+```bash
+herdr integration install codex
+herdr integration install devin
+herdr integration install opencode
+```
 
 ## Usar Docker dentro del contenedor
 
@@ -205,6 +241,8 @@ clis
 clis devin
 clis agy
 clis opencode
+clis codex
+clis herdr
 
 # Ejecutar cualquier comando dentro del contenedor
 clis pnpm install
