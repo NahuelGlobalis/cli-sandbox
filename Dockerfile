@@ -168,6 +168,13 @@ RUN HERDR_URL="$(awk -F '"' \
     && herdr --version \
     && rm -f /tmp/herdr-latest.json
 
+# Registrar las CLIs del Dockerfile como integraciones de Herdr.
+# Las integraciones opcionales agregan estado y restauración de sesiones
+# cuando el agente lo admite. Se instalan tras el binario de Herdr.
+RUN for cli in devin agy opencode codex; do \
+        herdr integration install "$cli" || echo "WARN: integration '$cli' no disponible"; \
+    done
+
 # Playwright global y navegador Chromium.
 RUN pnpm add -g "playwright@${PLAYWRIGHT_VERSION}" \
     && playwright install chromium
