@@ -1,3 +1,7 @@
+# Cliente Tailscale oficial para que Moshi pueda descubrir el nombre MagicDNS
+# del sidecar mediante el socket compartido.
+FROM tailscale/tailscale:stable AS tailscale
+
 # Imagen amd64 con CLIs de codificación asistida y navegadores
 FROM ubuntu:24.04
 
@@ -41,11 +45,16 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # Las dependencias gráficas de Chromium se instalan en el bloque de Playwright.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl wget ca-certificates git gnupg unzip xz-utils openssh-client \
+        curl wget ca-certificates git gnupg unzip xz-utils openssh-client openssh-server \
         build-essential libssl-dev pkg-config \
-        vim nano htop procps tree gosu rsync \
+        vim nano htop procps tree gosu rsync mosh tmux \
         fonts-liberation fonts-noto-color-emoji xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /etc/ssh/ssh_host_* \
+    && mkdir -p /run/sshd /var/lib/ssh
+
+COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY sshd_config.d/99-clis-code.conf /etc/ssh/sshd_config.d/99-clis-code.conf
 
 # --- 1b. Docker CLI (Docker-outside-of-Docker) ---
 # Se instala solo el cliente; el daemon se consume via socket del host.
@@ -96,6 +105,7 @@ RUN export HOME=/root \
 RUN userdel -r ubuntu 2>/dev/null || true \
     && groupdel ubuntu 2>/dev/null || true \
     && useradd --create-home --shell /bin/bash --uid 1000 dev \
+    && passwd -d dev \
     && mkdir -p /home/dev/.local/bin /home/dev/projects \
         /home/dev/.cache /home/dev/.config/herdr /home/dev/.local/state /home/dev/.local/share \
         /opt/pnpm-global/bin /opt/antigravity/bin /opt/herdr/bin /opt/playwright-browsers \
@@ -168,6 +178,22 @@ RUN HERDR_URL="$(awk -F '"' \
     && herdr --version \
     && rm -f /tmp/herdr-latest.json
 
+# Moshi Hook: Easy Pair para SSH/Mosh, sesiones tmux y eventos de los agentes.
+# El manifest remoto invalida la caché cuando se publica una versión nueva.
+USER root
+ADD https://cdn.getmoshi.app/hook/latest/version.txt /tmp/moshi-hook-latest.txt
+RUN MOSHI_HOOK_VERSION="$(tr -d '[:space:]' </tmp/moshi-hook-latest.txt)" \
+    && test -n "${MOSHI_HOOK_VERSION}" \
+    && curl -fsSL https://getmoshi.app/install.sh -o /tmp/moshi-install.sh \
+    && MOSHI_HOOK_SKIP_FIRST_RUN=1 \
+        MOSHI_HOOK_VERSION="${MOSHI_HOOK_VERSION}" \
+        INSTALL_DIR=/usr/local/bin \
+        sh /tmp/moshi-install.sh \
+    && moshi-hook --version \
+    && rm -f /tmp/moshi-install.sh /tmp/moshi-hook-latest.txt
+
+USER dev
+
 # Registrar las CLIs del Dockerfile como integraciones de Herdr.
 # Las integraciones opcionales agregan estado y restauración de sesiones
 # cuando el agente lo admite. Se instalan tras el binario de Herdr.
@@ -208,6 +234,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     && command -v opencode \
     && command -v codex \
     && command -v herdr \
+    && command -v moshi-hook \
+    && command -v mosh-server \
+    && command -v tmux \
+    && command -v sshd \
+    && command -v tailscale \
     && command -v uv \
     && command -v pnpm \
     && command -v playwright \

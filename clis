@@ -3,8 +3,10 @@ set -euo pipefail
 
 IMAGE="clis-code:latest"
 HOST_SKILLS_DIR="$HOME/.agents/skills"
+HOST_HOME_DIR="$HOME/.clis-code/home"
+CONTAINER_PROJECTS_DIR="/home/dev/projects"
 
-mkdir -p "$HOST_SKILLS_DIR"
+mkdir -p "$HOST_SKILLS_DIR" "$HOST_HOME_DIR"
 
 # --- Verificar que la imagen existe ---
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
@@ -13,16 +15,36 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     exit 1
 fi
 
+# --- Montar el repositorio actual y conservar el subdirectorio de trabajo ---
+HOST_CWD="$(pwd -P)"
+if HOST_PROJECT_DIR="$(git -C "$HOST_CWD" rev-parse --show-toplevel 2>/dev/null)"; then
+    HOST_PROJECT_DIR="$(cd "$HOST_PROJECT_DIR" && pwd -P)"
+else
+    HOST_PROJECT_DIR="$HOST_CWD"
+fi
+
+PROJECT_NAME="$(basename "$HOST_PROJECT_DIR")"
+CONTAINER_PROJECT_DIR="$CONTAINER_PROJECTS_DIR/$PROJECT_NAME"
+RELATIVE_CWD="${HOST_CWD#"$HOST_PROJECT_DIR"}"
+CONTAINER_WD="$CONTAINER_PROJECT_DIR$RELATIVE_CWD"
+
 # --- Construir argumentos de docker run ---
 DOCKER_ARGS=(
-    run -it --rm --init
+    run --rm --init
     -v /var/run/docker.sock:/var/run/docker.sock
-    -v "$HOME/.clis-code/home":/home/dev
+    -v "$HOST_HOME_DIR":/home/dev
     -v "$HOST_SKILLS_DIR":/home/dev/.agents/skills
-    -v "$PWD":/home/dev/projects
-    -w /home/dev/projects
+    -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
+    -v "$HOST_PROJECT_DIR":"$CONTAINER_PROJECT_DIR"
+    -w "$CONTAINER_WD"
     -v "$HOME/.ssh":/home/dev/.ssh:ro
 )
+
+if [[ -t 0 && -t 1 ]]; then
+    DOCKER_ARGS+=(-it)
+else
+    DOCKER_ARGS+=(-i)
+fi
 
 # --- SSH agent forwarding (si el agent está activo en el host) ---
 if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
@@ -37,10 +59,12 @@ CMD_ARGS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --port|-p)
+            [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
             DOCKER_ARGS+=("-p" "$2")
             shift 2
             ;;
         --env|-e)
+            [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
             DOCKER_ARGS+=("-e" "$2")
             shift 2
             ;;

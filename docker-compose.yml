@@ -1,4 +1,32 @@
 services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: clis-tailscale
+    hostname: ${TAILSCALE_HOSTNAME:-clis-code}
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?Define TS_AUTHKEY en .env}
+      TS_AUTH_ONCE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SOCKET: /var/run/tailscale/tailscaled.sock
+      TS_USERSPACE: "false"
+      TS_ACCEPT_DNS: "true"
+      TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-clis-code}
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - tailscale-socket:/var/run/tailscale
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    healthcheck:
+      test: ["CMD", "tailscale", "status", "--json"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
   clis-code:
     # La imagen contiene Google Chrome y CLIs que solo distribuyen amd64.
     platform: linux/amd64
@@ -9,11 +37,16 @@ services:
         IMAGE_VERSION: ${IMAGE_VERSION:-dev}
     image: clis-code:latest
     container_name: clis-code
+    # SSH y Mosh quedan accesibles mediante la IP/MagicDNS del tailnet, sin
+    # publicar puertos en Internet.
+    network_mode: service:tailscale
+    depends_on:
+      tailscale:
+        condition: service_healthy
     # Manejo correcto de señales (Ctrl+C, zombies)
     init: true
     # Reiniciar a menos que se haya detenido manualmente
     restart: unless-stopped
-    # Modo interactivo por defecto
     stdin_open: true
     tty: true
     # Antigravity puede requerir seccomp:unconfined y SYS_PTRACE en algunos
@@ -22,6 +55,8 @@ services:
       - HOME=/home/dev
       - XDG_DATA_HOME=/home/dev/.local/share
       - TZ=UTC
+      - TAILSCALE_SOCKET=/var/run/tailscale/tailscaled.sock
+      - MOSHI_HOOK_AUTOSTART=1
       # Git: identidad (sobreescribe .gitconfig del host sin modificarlo)
       - GIT_AUTHOR_NAME=nahuel.cano
       - GIT_AUTHOR_EMAIL=nahuelcano@gmail.com
@@ -30,18 +65,22 @@ services:
     volumes:
       # Docker: montar el socket del host para usar el daemon desde dentro
       - /var/run/docker.sock:/var/run/docker.sock
-      # Home completo: el volume principal persiste configs, credenciales, cache y estado
-      # de todas las CLIs. El entrypoint sincroniza el skeleton en el primer arranque.
+      # Home completo: persiste configs, credenciales y la authorized_keys que
+      # Easy Pair crea para el celular.
       - ${HOME}/.clis-code/home:/home/dev
+      - tailscale-socket:/var/run/tailscale
+      - ssh-host-keys:/var/lib/ssh
       # Skills compartidas con el host en lectura y escritura.
       - ${HOME}/.agents/skills:/home/dev/.agents/skills
-      # Git y SSH: compartir configuración y credenciales del host en modo lectura.
+      # Git se comparte en modo lectura. ~/.ssh del host no se monta: Moshi usa
+      # una clave exclusiva generada en el teléfono.
       - ${HOME}/.gitconfig:/home/dev/.gitconfig:ro
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
-      - ${HOME}/.ssh:/home/dev/.ssh:ro
       # Proyectos de trabajo
       - ${HOME}/.clis-code/projects:/home/dev/projects
-    # Si necesitas exponer puertos (por ejemplo, para el modo web de alguna CLI)
-    # ports:
-    #   - "3000:3000"
-    command: ["/bin/bash"]
+    command: ["sleep", "infinity"]
+
+volumes:
+  tailscale-state:
+  tailscale-socket:
+  ssh-host-keys:

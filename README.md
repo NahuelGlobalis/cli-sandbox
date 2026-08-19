@@ -9,6 +9,9 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 - **OpenCode CLI** (`opencode`) – Anomaly
 - **Codex CLI** (`codex`) – OpenAI
 - **Herdr** (`herdr`) – multiplexor de terminal para agentes
+- **Moshi Hook** (`moshi-hook`) – Easy Pair, notificaciones y vistas de agentes
+- **OpenSSH + Mosh + tmux** – acceso remoto y sesiones persistentes
+- **Tailscale CLI** – usa el daemon del sidecar para descubrir MagicDNS
 - **pnpm** – gestor de paquetes Node.js
 - **uv** – gestor de Python y entornos
 - **Google Chrome** + **Chromium** para Playwright
@@ -18,6 +21,10 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 
 - Docker Desktop o Docker Engine en Windows/Linux/macOS
 - ~ 5 GB de espacio libre (imagen grande por navegadores y Node)
+
+Para el acceso desde el celular también necesitás una cuenta de Tailscale y las
+apps de [Tailscale](https://tailscale.com/download) y
+[Moshi](https://getmoshi.app/) instaladas en el teléfono.
 
 ## Construir la imagen
 
@@ -162,6 +169,92 @@ herdr integration install devin
 herdr integration install opencode
 ```
 
+## Acceso desde el celular con Tailscale + Moshi
+
+El Compose incluye un sidecar oficial de Tailscale y hace que `clis-code`
+comparta su red. OpenSSH escucha dentro del tailnet y Mosh usa su rango UDP
+normal (`60000:61000`) sin publicar ningún puerto en Internet.
+
+### 1. Registrar el contenedor en Tailscale
+
+Generá una auth key en
+[Tailscale Admin > Keys](https://login.tailscale.com/admin/settings/keys). Para
+este contenedor persistente no marques el nodo como `ephemeral`; una key de un
+solo uso alcanza porque la identidad queda guardada en el volume.
+Después creá tu archivo local de configuración:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+Pegá la key en `TS_AUTHKEY`, construí la imagen y levantá ambos servicios:
+
+```powershell
+docker compose build clis-code
+docker compose up -d
+docker compose ps
+```
+
+El estado del nodo y su nombre MagicDNS se pueden comprobar así:
+
+```powershell
+docker compose exec -u dev clis-code tailscale status
+docker compose exec -u dev clis-code tailscale ip -4
+```
+
+La identidad de Tailscale queda en un volume y `TS_AUTH_ONCE=true` evita
+reautenticar el nodo en cada reinicio. El archivo `.env` contiene un secreto y
+está ignorado por Git.
+
+### 2. Emparejar Moshi
+
+En el celular, iniciá sesión en la app de Tailscale con la misma cuenta y dejá
+el túnel activo. Luego abrí Moshi y ejecutá en la PC:
+
+```powershell
+docker compose exec -u dev -it clis-code moshi-hook host setup
+```
+
+Escaneá desde Moshi el QR de Easy Pair. El comando detecta el nombre MagicDNS,
+Moshi genera una clave Ed25519 exclusiva en el teléfono y sólo agrega la clave
+pública a `/home/dev/.ssh/authorized_keys` dentro del home persistente.
+
+Usá **Auto** como tipo de conexión. No habilites Tailscale SSH: Moshi necesita
+OpenSSH normal sobre Tailscale para Easy Pair y para iniciar Mosh.
+
+### 3. Abrir Herdr y activar eventos de agentes
+
+Una vez conectado desde Moshi:
+
+```bash
+cd ~/projects
+herdr
+```
+
+Para recibir aprobaciones, finalizaciones y vistas de Codex/OpenCode en Moshi,
+copiá el token de `Moshi > Settings > Hooks` y corré dentro de la conexión:
+
+```bash
+moshi-hook pair --token <token-de-moshi>
+moshi-hook install
+```
+
+Reiniciá una vez el servicio para asegurar que el daemon quede activo con el
+nuevo pairing:
+
+```powershell
+docker compose restart clis-code
+```
+
+Diagnóstico rápido:
+
+```powershell
+docker compose logs tailscale
+docker compose exec -u dev clis-code moshi-hook status
+docker compose exec clis-code sshd -t
+```
+
 ## Usar Docker dentro del contenedor
 
 La imagen incluye el CLI de Docker (`docker`), `docker buildx` y `docker compose`. Se usa el patrón **Docker-outside-of-Docker**: el contenedor no ejecuta un daemon propio, sino que se conecta al daemon del host montando `/var/run/docker.sock`.
@@ -214,7 +307,7 @@ google-chrome --headless --no-sandbox --disable-gpu --dump-dom https://example.c
 
 ## Script `clis` (acceso rápido)
 
-El repositorio incluye un script `clis` que lanza el contenedor con todos los mounts configurados correctamente, montando el directorio actual como workspace:
+El repositorio incluye un script `clis` que lanza el contenedor con los mounts configurados correctamente. Detecta la raíz del repositorio Git actual, la monta como workspace y conserva dentro del contenedor el subdirectorio desde el que ejecutaste el comando.
 
 ### Instalación
 
@@ -222,6 +315,7 @@ El repositorio incluye un script `clis` que lanza el contenedor con todos los mo
 
 ```bash
 # Desde la raíz del repositorio clonado
+mkdir -p ~/.local/bin
 ln -sf "$(pwd)/clis" ~/.local/bin/clis
 ```
 
@@ -242,6 +336,7 @@ source ~/.bashrc
 
 ```bash
 # Abrir bash interactivo en el directorio actual
+cd /mnt/c/dev/repos/mi-proyecto
 clis
 
 # Ejecutar una CLI directamente
@@ -272,21 +367,21 @@ docker build -t clis-code:latest .
 
 El flag `--init` se pasa automáticamente a `docker run` para manejo correcto de señales (Ctrl+C, procesos zombie).
 
-El script monta `$PWD` como `/home/dev/projects`, persiste el home en `~/.clis-code/home` y comparte `~/.agents/skills` con `/home/dev/.agents/skills`.
+El script monta la raíz del repositorio actual como `/home/dev/projects/<repo>`, persiste el home en `~/.clis-code/home` y comparte `~/.agents/skills` con `/home/dev/.agents/skills`. Si se invoca fuera de un repositorio Git, monta el directorio actual con el mismo comportamiento.
 
 ## Docker Compose
 
-Existe un `docker-compose.yml` de ejemplo con `init: true` y `restart: unless-stopped`. Para usarlo:
+El `docker-compose.yml` está preparado para funcionar siempre encendido con
+Tailscale, OpenSSH, Mosh y Moshi. Después de configurar `.env`, levantalo en
+segundo plano:
 
 ```powershell
-docker-compose run --rm clis-code
+docker compose up -d
+docker compose exec -u dev -it clis-code bash
 ```
 
-O en segundo plano:
-
-```powershell
-docker-compose up -d clis-code
-```
+La guía completa de autenticación y Easy Pair está en
+[Acceso desde el celular con Tailscale + Moshi](#acceso-desde-el-celular-con-tailscale--moshi).
 
 ## Versionado
 
