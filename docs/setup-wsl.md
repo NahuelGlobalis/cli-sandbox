@@ -37,6 +37,7 @@ Edita `.env` y define:
 ```dotenv
 TS_AUTHKEY=tskey-auth-...
 TAILSCALE_HOSTNAME=clis-code
+CLIS_PROJECTS_ROOT=/mnt/c/dev
 ```
 
 La key no debe ser efimera. Puede ser de un solo uso porque la identidad se
@@ -88,8 +89,13 @@ clis herdr
 clis --env API_KEY=valor comando
 ```
 
-`clis` monta la raiz Git actual y mantiene el subdirectorio desde el que se
-invoco. Si no estas dentro de un repo Git, monta el directorio actual.
+`clis` monta la raiz de proyectos y mantiene el subdirectorio desde el que se
+invoco dentro del volumen compartido. La raiz completa `/mnt/c/dev` se monta
+en `/home/dev/projects`; por ejemplo, `/mnt/c/dev/repos/mi-proyecto` se
+convierte en `/home/dev/projects/repos/mi-proyecto`.
+
+El comando debe ejecutarse bajo `CLIS_PROJECTS_ROOT`. Para usar otra raiz,
+define la misma variable en `.env` y en el shell que ejecuta `clis`.
 
 ## Entrar al servicio persistente
 
@@ -101,7 +107,7 @@ docker compose exec -u dev -it clis-code bash
 ```
 
 Usa este modo para Easy Pair, inspeccionar el daemon Moshi o trabajar sobre
-proyectos guardados en `~/.clis-code/projects`.
+cualquier repo montado desde `CLIS_PROJECTS_ROOT`.
 
 ## Actualizar la imagen
 

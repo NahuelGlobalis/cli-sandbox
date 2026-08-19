@@ -123,8 +123,8 @@ No uses `moshi .` para adjuntar una sesion Herdr.
 
 ## Proyectos visibles en remoto
 
-El servicio persistente monta `~/.clis-code/projects` en `/home/dev/projects`.
-Una sesion `clis` superpone dinamicamente el repo actual en ese path. Para
-iniciar un proyecto directamente desde Moshi, guardalo bajo
-`~/.clis-code/projects` en WSL o inicialo primero desde `clis` y adjunta la
-sesion Herdr mientras su contenedor siga activo.
+El servicio persistente y las sesiones `clis` montan la misma raiz
+`CLIS_PROJECTS_ROOT` en `/home/dev/projects`. Con el valor predeterminado,
+`/mnt/c/dev/repos/mi-proyecto` queda disponible desde Moshi como
+`/home/dev/projects/repos/mi-proyecto`. No hace falta copiar ni volver a montar
+repos individuales.

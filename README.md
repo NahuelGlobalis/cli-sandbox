@@ -323,7 +323,9 @@ google-chrome --headless --no-sandbox --disable-gpu --dump-dom https://example.c
 
 ## Script `clis` (acceso rápido)
 
-El repositorio incluye un script `clis` que lanza el contenedor con los mounts configurados correctamente. Detecta la raíz del repositorio Git actual, la monta como workspace y conserva dentro del contenedor el subdirectorio desde el que ejecutaste el comando.
+El repositorio incluye un script `clis` que lanza el contenedor con los mounts
+configurados correctamente. Monta la raíz `CLIS_PROJECTS_ROOT` y conserva dentro
+del contenedor la ruta relativa desde la que ejecutaste el comando.
 
 ### Instalación
 
@@ -378,8 +380,9 @@ clis -e MY_VAR=value agy
 `clis` ejecuta una sesión efímera del servicio Compose `clis-code`. Compose
 levanta automáticamente el sidecar `clis-tailscale`, espera a que esté sano y
 comparte con la sesión su red, socket de Tailscale, Docker socket, home
-persistente, credenciales, skills y claves SSH. El repositorio Git actual se
-superpone dinámicamente dentro de `/home/dev/projects`.
+persistente, credenciales, skills y claves SSH. La raíz
+`CLIS_PROJECTS_ROOT` (`/mnt/c/dev` por defecto) se monta completa en
+`/home/dev/projects`.
 
 El script verifica que la imagen exista antes de ejecutar. Si no existe, muestra cómo crearla:
 
@@ -391,7 +394,11 @@ La configuración `init: true` del servicio maneja correctamente señales y
 procesos zombie. Las sesiones efímeras no arrancan otro SSH ni otro Moshi Hook,
 evitando conflictos de puertos con el servicio persistente.
 
-El script monta la raíz del repositorio actual como `/home/dev/projects/<repo>`, persiste el home en `~/.clis-code/home` y comparte `~/.agents/skills` con `/home/dev/.agents/skills`. Si se invoca fuera de un repositorio Git, monta el directorio actual con el mismo comportamiento.
+El script conserva la ruta relativa desde `CLIS_PROJECTS_ROOT`: si se invoca en
+`/mnt/c/dev/repos/mi-proyecto/src`, abre
+`/home/dev/projects/repos/mi-proyecto/src`. La raíz completa queda visible tanto
+en sesiones `clis` como desde Moshi. El home persiste en
+`~/.clis-code/home` y las skills se comparten desde `~/.agents/skills`.
 
 No se publican puertos con `-p` porque el contenedor comparte el namespace de
 red de Tailscale. Para exponer un servidor al tailnet, hacelo escuchar en

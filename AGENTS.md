@@ -22,7 +22,7 @@ Moshi.
 - `docker-compose.yml`: fuente de verdad de red, volumenes y runtime remoto.
 - `entrypoint.sh`: bootstrap, permisos y daemons; baja de root a `dev` con
   `gosu`.
-- `clis`: entrada desde WSL; crea sesiones Compose efimeras y monta el repo.
+- `clis`: entrada desde WSL; crea sesiones efimeras sobre la raiz de proyectos.
 - `sshd_config.d/`: politica SSH/Mosh y PATH remoto para el usuario `dev`.
 - `.env.example`: contrato publico; nunca autoriza leer el `.env` real.
 - `docs/`: guias por subsistema; actualizar ante cambios observables.
@@ -37,7 +37,8 @@ Moshi.
   `CLIS_REMOTE_SERVICES=0` para evitar puertos y daemons duplicados.
 - `/home/dev` se comparte mediante `~/.clis-code/home`; contiene credenciales,
   hooks, `authorized_keys` y sockets de Herdr.
-- `clis` superpone el repo actual en `/home/dev/projects/<repo>`.
+- `/mnt/c/dev` se monta en `/home/dev/projects` por defecto. `clis` conserva la
+  ruta relativa del directorio desde el que se invoca.
 - La imagen y algunas CLIs solo soportan `linux/amd64`.
 
 ## Environment and setup

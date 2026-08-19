@@ -76,8 +76,8 @@ services:
       # una clave exclusiva generada en el teléfono.
       - ${HOME}/.gitconfig:/home/dev/.gitconfig:ro
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
-      # Proyectos de trabajo
-      - ${HOME}/.clis-code/projects:/home/dev/projects
+      # Todos los repos comparten la misma ruta en sesiones locales y remotas.
+      - ${CLIS_PROJECTS_ROOT:-/mnt/c/dev}:/home/dev/projects
     command: ["sleep", "infinity"]
 
 volumes:

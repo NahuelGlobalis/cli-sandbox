@@ -5,8 +5,8 @@ set -euo pipefail
 # Esto popula el volume vacío en el primer arranque.
 rsync -a --ignore-existing /home/dev-skel/ /home/dev/
 
-# Corregir ownership del home (ignora read-only bind mounts).
-chown -R dev:dev /home/dev 2>/dev/null || true
+# Corregir ownership sin recorrer mounts anidados como projects o skills.
+find /home/dev -xdev -exec chown dev:dev {} + 2>/dev/null || true
 
 # Generar claves de host SSH persistentes en el primer arranque. Se guardan
 # fuera de la imagen para que Moshi no vea una identidad distinta al recrear

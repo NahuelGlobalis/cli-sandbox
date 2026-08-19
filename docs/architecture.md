@@ -39,8 +39,7 @@ Este es el servicio al que se conecta Moshi. Su comando principal es
 
 El script `clis` ejecuta `docker compose run --rm --no-deps clis-code` y:
 
-- Detecta la raiz del repositorio Git actual.
-- La monta en `/home/dev/projects/<repo>`.
+- Monta la raiz compartida `CLIS_PROJECTS_ROOT` (`/mnt/c/dev` por defecto).
 - Conserva el subdirectorio actual como working directory.
 - Comparte red, home, credenciales, skills y Docker socket con Compose.
 - Inicia primero el sidecar y exige `BackendState=Running`.
@@ -55,14 +54,16 @@ persistente que recibe las conexiones del telefono.
 | Host WSL / volumen | Contenedor | Contenido |
 | --- | --- | --- |
 | `~/.clis-code/home` | `/home/dev` | Credenciales, hooks y sockets |
-| `~/.clis-code/projects` | `/home/dev/projects` | Proyectos persistentes |
+| `/mnt/c/dev` | `/home/dev/projects` | Todos los repos de trabajo |
 | `~/.agents/skills` | `/home/dev/.agents/skills` | Skills compartidas |
 | `tailscale-state` | `/var/lib/tailscale` | Identidad del nodo |
 | `tailscale-socket` | `/var/run/tailscale` | Socket del daemon Tailscale |
 | `ssh-host-keys` | `/var/lib/ssh` | Identidad estable de OpenSSH |
 
-El repo actual se superpone dinamicamente sobre `/home/dev/projects/<repo>` en
-las sesiones creadas por `clis`.
+La ruta relativa se conserva. Por ejemplo,
+`/mnt/c/dev/repos/publics/cli-sandbox` se abre como
+`/home/dev/projects/repos/publics/cli-sandbox`. El servicio persistente y las
+sesiones `clis` ven el mismo arbol completo.
 
 ## Sesiones Herdr entre contenedores
 
