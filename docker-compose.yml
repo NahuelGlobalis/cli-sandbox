@@ -20,7 +20,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     healthcheck:
-      test: ["CMD", "tailscale", "status", "--json"]
+      test: ["CMD-SHELL", "tailscale status --json | grep -q '\"BackendState\":[[:space:]]*\"Running\"'"]
       interval: 10s
       timeout: 5s
       retries: 12

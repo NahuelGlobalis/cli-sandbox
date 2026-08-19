@@ -91,7 +91,7 @@ RUN export HOME=/root \
     && test -x /usr/local/bin/uv \
     && test -x /usr/local/bin/uvx \
     && mkdir -p /opt/uv/python \
-    && uv python install -i /opt/uv/python "${PYTHON_VERSION}" \
+    && uv python install --no-bin -i /opt/uv/python "${PYTHON_VERSION}" \
     && PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")" \
     && PYTHON_DIR="$(dirname "${PYTHON_BIN}")" \
     && ln -sf "${PYTHON_BIN}" "/usr/local/bin/python${PYTHON_VERSION}" \

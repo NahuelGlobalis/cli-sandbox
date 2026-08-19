@@ -51,17 +51,21 @@ if [[ -n "${TAILSCALE_SOCKET:-}" ]]; then
     fi
 fi
 
-# OpenSSH normal (no Tailscale SSH) es necesario para Easy Pair y para que
-# Mosh pueda iniciar su transporte UDP.
-mkdir -p /run/sshd
-/usr/sbin/sshd
+# Las sesiones efímeras creadas por `clis` comparten la red de Tailscale con el
+# servicio persistente, por lo que no deben intentar ocupar otra vez sus puertos.
+if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
+    # OpenSSH normal (no Tailscale SSH) es necesario para Easy Pair y para que
+    # Mosh pueda iniciar su transporte UDP.
+    mkdir -p /run/sshd
+    /usr/sbin/sshd
 
-# El daemon mantiene las notificaciones y vistas de agentes. Antes de hacer
-# pair puede quedar esperando configuración o terminar sin afectar SSH/Mosh.
-if [[ "${MOSHI_HOOK_AUTOSTART:-1}" == "1" ]]; then
-    install -d -m 0755 -o dev -g dev /home/dev/.local/state/moshi-hook
-    gosu dev moshi-hook serve \
-        >>/home/dev/.local/state/moshi-hook/serve.log 2>&1 &
+    # El daemon mantiene las notificaciones y vistas de agentes. Antes de hacer
+    # pair puede quedar esperando configuración o terminar sin afectar SSH/Mosh.
+    if [[ "${MOSHI_HOOK_AUTOSTART:-1}" == "1" ]]; then
+        install -d -m 0755 -o dev -g dev /home/dev/.local/state/moshi-hook
+        gosu dev moshi-hook serve \
+            >>/home/dev/.local/state/moshi-hook/serve.log 2>&1 &
+    fi
 fi
 
 exec gosu dev "$@"

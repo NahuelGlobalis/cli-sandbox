@@ -19,7 +19,7 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 
 ## Requisitos
 
-- Docker Desktop o Docker Engine en Windows/Linux/macOS
+- Docker Desktop o Docker Engine con Docker Compose v2 en Windows/Linux/macOS
 - ~ 5 GB de espacio libre (imagen grande por navegadores y Node)
 
 Para el acceso desde el celular también necesitás una cuenta de Tailscale y las
@@ -40,7 +40,7 @@ la imagen, no al ejecutar el contenedor.
 
 ## Ejecutar el contenedor
 
-### Básico (sin persistencia)
+### Básico (sin persistencia ni Tailscale)
 
 ```powershell
 docker run -it --rm clis-code:latest
@@ -196,6 +196,11 @@ docker compose up -d
 docker compose ps
 ```
 
+Si el tailnet tiene habilitada la aprobación de dispositivos, entra a
+[Tailscale Admin > Machines](https://login.tailscale.com/admin/machines) y
+aprobá el nodo `clis-code`. Hasta entonces aparecerá como pendiente, el estado
+será `NeedsMachineAuth` y `clis` indicará que falta esa aprobación.
+
 El estado del nodo y su nombre MagicDNS se pueden comprobar así:
 
 ```powershell
@@ -324,7 +329,11 @@ ln -sf "$(pwd)/clis" ~/.local/bin/clis
 ```bash
 cp clis ~/.local/bin/clis
 chmod +x ~/.local/bin/clis
+echo 'export CLIS_REPO_DIR="/ruta/al/repositorio/clis-code"' >> ~/.bashrc
 ```
+
+Al copiarlo, `CLIS_REPO_DIR` debe apuntar al clon que contiene
+`docker-compose.yml` y `.env`. El symlink detecta esa ruta automáticamente.
 
 > Requiere que `~/.local/bin` esté en tu `PATH`. En la mayoría de distribuciones Linux ya lo está. Si no:
 ```bash
@@ -350,24 +359,32 @@ clis herdr
 clis pnpm install
 clis uv run python script.py
 
-# Exponer puertos (ej: servidor web de una CLI)
-clis --port 3000 opencode
-clis -p 8080:80 -p 8443:443 devin
-
 # Pasar variables de entorno
 clis --env API_KEY=secret opencode
 clis -e MY_VAR=value agy
 ```
 
+`clis` ejecuta una sesión efímera del servicio Compose `clis-code`. Compose
+levanta automáticamente el sidecar `clis-tailscale`, espera a que esté sano y
+comparte con la sesión su red, socket de Tailscale, Docker socket, home
+persistente, credenciales, skills y claves SSH. El repositorio Git actual se
+superpone dinámicamente dentro de `/home/dev/projects`.
+
 El script verifica que la imagen exista antes de ejecutar. Si no existe, muestra cómo crearla:
 
 ```bash
-docker build -t clis-code:latest .
+docker compose build clis-code
 ```
 
-El flag `--init` se pasa automáticamente a `docker run` para manejo correcto de señales (Ctrl+C, procesos zombie).
+La configuración `init: true` del servicio maneja correctamente señales y
+procesos zombie. Las sesiones efímeras no arrancan otro SSH ni otro Moshi Hook,
+evitando conflictos de puertos con el servicio persistente.
 
 El script monta la raíz del repositorio actual como `/home/dev/projects/<repo>`, persiste el home en `~/.clis-code/home` y comparte `~/.agents/skills` con `/home/dev/.agents/skills`. Si se invoca fuera de un repositorio Git, monta el directorio actual con el mismo comportamiento.
+
+No se publican puertos con `-p` porque el contenedor comparte el namespace de
+red de Tailscale. Para exponer un servidor al tailnet, hacelo escuchar en
+`0.0.0.0` y accedé a `clis-code:<puerto>` por MagicDNS.
 
 ## Docker Compose
 
@@ -429,6 +446,15 @@ El repositorio incluye dos workflows de GitHub Actions:
 - **Versiones:** OpenCode y Codex usan `latest` por defecto mediante argumentos `ARG`; las CLIs propietarias se resuelven desde sus manifests oficiales.
 
 ## Troubleshooting
+
+### `docker: 'compose' is not a docker command`
+
+Instala Docker Compose v2 en Ubuntu/WSL:
+
+```bash
+sudo apt update
+sudo apt install docker-compose-v2
+```
 
 ### `Permission denied` al montar volúmenes en Windows
 

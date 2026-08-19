@@ -8,10 +8,40 @@ CONTAINER_PROJECTS_DIR="/home/dev/projects"
 
 mkdir -p "$HOST_SKILLS_DIR" "$HOST_HOME_DIR"
 
+# --- Localizar la configuración del repositorio, incluso desde un symlink ---
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd -P)"
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" = /* ]] || SCRIPT_PATH="$SCRIPT_DIR/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd -P)"
+CLIS_REPO_DIR="${CLIS_REPO_DIR:-$SCRIPT_DIR}"
+COMPOSE_FILE="${CLIS_COMPOSE_FILE:-$CLIS_REPO_DIR/docker-compose.yml}"
+ENV_FILE="${CLIS_ENV_FILE:-$CLIS_REPO_DIR/.env}"
+
+if ! docker compose version >/dev/null 2>&1; then
+    echo "Error: Docker Compose v2 no está instalado." >&2
+    echo "Instalalo en Ubuntu/WSL con:  sudo apt install docker-compose-v2" >&2
+    exit 1
+fi
+
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+    echo "Error: no se encontró $COMPOSE_FILE" >&2
+    echo "Si copiaste este script, definí CLIS_REPO_DIR con la ruta del repositorio clis-code." >&2
+    exit 1
+fi
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo "Error: no se encontró $ENV_FILE" >&2
+    echo "Crealo desde .env.example y configurá TS_AUTHKEY." >&2
+    exit 1
+fi
+
 # --- Verificar que la imagen existe ---
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "Error: la imagen '$IMAGE' no existe." >&2
-    echo "Creala con:  docker build -t $IMAGE ." >&2
+    echo "Creala con:  docker compose --file $COMPOSE_FILE --env-file $ENV_FILE build clis-code" >&2
     exit 1
 fi
 
@@ -28,44 +58,46 @@ CONTAINER_PROJECT_DIR="$CONTAINER_PROJECTS_DIR/$PROJECT_NAME"
 RELATIVE_CWD="${HOST_CWD#"$HOST_PROJECT_DIR"}"
 CONTAINER_WD="$CONTAINER_PROJECT_DIR$RELATIVE_CWD"
 
-# --- Construir argumentos de docker run ---
-DOCKER_ARGS=(
-    run --rm --init
-    -v /var/run/docker.sock:/var/run/docker.sock
-    -v "$HOST_HOME_DIR":/home/dev
-    -v "$HOST_SKILLS_DIR":/home/dev/.agents/skills
+# --- Ejecutar el servicio Compose con el repositorio actual superpuesto ---
+COMPOSE_ARGS=(
+    compose
+    --file "$COMPOSE_FILE"
+    --env-file "$ENV_FILE"
+    --project-directory "$CLIS_REPO_DIR"
+)
+RUN_ARGS=(
+    run --rm --no-deps
+    -e CLIS_REMOTE_SERVICES=0
     -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
     -v "$HOST_PROJECT_DIR":"$CONTAINER_PROJECT_DIR"
     -w "$CONTAINER_WD"
-    -v "$HOME/.ssh":/home/dev/.ssh:ro
 )
 
-if [[ -t 0 && -t 1 ]]; then
-    DOCKER_ARGS+=(-it)
-else
-    DOCKER_ARGS+=(-i)
+if [[ ! -t 0 || ! -t 1 ]]; then
+    RUN_ARGS+=(-T)
 fi
 
 # --- SSH agent forwarding (si el agent está activo en el host) ---
 if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
-    DOCKER_ARGS+=(
+    RUN_ARGS+=(
         -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock
         -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock
     )
 fi
 
-# --- Parsear flags del script: --port/-p, --env/-e ---
+# --- Parsear flags del script ---
 CMD_ARGS=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --port|-p)
             [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
-            DOCKER_ARGS+=("-p" "$2")
-            shift 2
+            echo "Error: --port no es compatible con la red compartida de Tailscale." >&2
+            echo "Escuchá en 0.0.0.0 y accedé a clis-code:<puerto> desde el tailnet." >&2
+            exit 2
             ;;
         --env|-e)
             [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
-            DOCKER_ARGS+=("-e" "$2")
+            RUN_ARGS+=("-e" "$2")
             shift 2
             ;;
         *)
@@ -75,8 +107,36 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
-    docker "${DOCKER_ARGS[@]}" "$IMAGE" "${CMD_ARGS[@]}"
-else
-    docker "${DOCKER_ARGS[@]}" "$IMAGE"
+if [[ ${#CMD_ARGS[@]} -eq 0 ]]; then
+    CMD_ARGS=(/bin/bash)
 fi
+
+# Compose considera al sidecar una dependencia, pero hacemos el arranque aquí
+# para poder informar claramente si el tailnet exige aprobar el dispositivo.
+docker "${COMPOSE_ARGS[@]}" up -d tailscale >/dev/null
+TAILSCALE_STATE=""
+for _ in {1..30}; do
+    TAILSCALE_STATE="$(
+        docker "${COMPOSE_ARGS[@]}" exec -T tailscale tailscale status --json 2>/dev/null \
+            | sed -n 's/.*"BackendState":[[:space:]]*"\([^"]*\)".*/\1/p'
+    )"
+    case "$TAILSCALE_STATE" in
+        Running)
+            break
+            ;;
+        NeedsMachineAuth)
+            echo "Error: el nodo clis-code espera aprobación en Tailscale Admin > Machines." >&2
+            echo "Aprobalo en https://login.tailscale.com/admin y volvé a ejecutar clis." >&2
+            exit 1
+            ;;
+    esac
+    sleep 1
+done
+
+if [[ "$TAILSCALE_STATE" != "Running" ]]; then
+    echo "Error: Tailscale no alcanzó el estado Running (estado: ${TAILSCALE_STATE:-desconocido})." >&2
+    echo "Revisá: docker compose --file $COMPOSE_FILE logs tailscale" >&2
+    exit 1
+fi
+
+docker "${COMPOSE_ARGS[@]}" "${RUN_ARGS[@]}" clis-code "${CMD_ARGS[@]}"
