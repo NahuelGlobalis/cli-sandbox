@@ -26,6 +26,17 @@ Para el acceso desde el celular también necesitás una cuenta de Tailscale y la
 apps de [Tailscale](https://tailscale.com/download) y
 [Moshi](https://getmoshi.app/) instaladas en el teléfono.
 
+## Documentación
+
+Las guías detalladas están organizadas por tema en [`docs/`](docs/README.md):
+
+- [Arquitectura y modos de ejecución](docs/architecture.md)
+- [Instalación en WSL](docs/setup-wsl.md)
+- [Tailscale y MagicDNS](docs/tailscale.md)
+- [Moshi, Easy Pair y hooks](docs/moshi.md)
+- [Codex, OpenCode y sesiones Herdr](docs/agents-and-herdr.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
 ## Construir la imagen
 
 ```powershell
@@ -218,7 +229,7 @@ En el celular, iniciá sesión en la app de Tailscale con la misma cuenta y dej�
 el túnel activo. Luego abrí Moshi y ejecutá en la PC:
 
 ```powershell
-docker compose exec -u dev -it clis-code moshi-hook host setup
+docker compose exec -u dev -it clis-code moshi-hook host setup --user dev
 ```
 
 Escaneá desde Moshi el QR de Easy Pair. El comando detecta el nombre MagicDNS,
@@ -462,10 +473,12 @@ Asegúrate de que Docker Desktop tenga habilitado el recurso compartido (`Settin
 
 ### `devin`, `agy` o `opencode` no se encuentran
 
-El `PATH` está configurado para `/home/dev/.local/bin` y `/home/dev/.pnpm-global/bin`. Si un script no agregó el binario correctamente, recarga el shell:
+El `PATH` remoto incluye `/home/dev/.local/bin`, `/opt/pnpm-global/bin` y
+`/opt/herdr/bin`. Si la sesión se abrió antes de actualizar la imagen,
+reconectala o ajusta temporalmente el PATH:
 
 ```bash
-export PATH="$HOME/.local/bin:$HOME/.pnpm-global/bin:$PATH"
+export PATH="/opt/herdr/bin:$HOME/.local/bin:/opt/pnpm-global/bin:$PATH"
 ```
 
 ### Playwright no encuentra el navegador
@@ -492,6 +505,7 @@ uv run python script.py
 - `docker-compose.yml` – orquestación de ejemplo
 - `clis` – script de acceso rápido para lanzar el contenedor
 - `README.md` – este documento
+- `docs/` – guías de arquitectura, WSL, Tailscale, Moshi, Herdr y diagnóstico
 - `LICENSE` – licencia MIT
 - `.github/workflows/docker-build.yml` – CI: build en push/PR
 - `.github/workflows/docker-publish.yml` – CD: publish a GHCR en tags
