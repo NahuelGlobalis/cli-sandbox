@@ -28,11 +28,20 @@ chmod 0644 /var/lib/ssh/ssh_host_*_key.pub
 # Si el socket de Docker está montado, asegurar que dev pueda acceder.
 if [[ -S /var/run/docker.sock ]]; then
     SOCKET_GID="$(stat -c '%g' /var/run/docker.sock)"
-    if ! getent group docker >/dev/null 2>&1; then
-        groupadd -g "${SOCKET_GID}" docker
+    # El GID del socket puede ya estar usado por un grupo del sistema
+    # (p. ej. systemd-journal en GID 999). Reusar ese grupo en vez de
+    # intentar crear uno nuevo con un GID colisionado.
+    EXISTING_GROUP="$(getent group "${SOCKET_GID}" | cut -d: -f1 || true)"
+    if [[ -n "$EXISTING_GROUP" ]]; then
+        DOCKER_GROUP="$EXISTING_GROUP"
+    else
+        if ! getent group docker >/dev/null 2>&1; then
+            groupadd -g "${SOCKET_GID}" docker
+        fi
+        DOCKER_GROUP="docker"
     fi
-    if ! id dev | grep -q "docker"; then
-        usermod -aG docker dev
+    if ! id dev | grep -q "(${DOCKER_GROUP})"; then
+        usermod -aG "${DOCKER_GROUP}" dev
     fi
 fi
 

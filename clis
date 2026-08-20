@@ -4,7 +4,6 @@ set -euo pipefail
 IMAGE="clis-code:latest"
 HOST_SKILLS_DIR="$HOME/.agents/skills"
 HOST_HOME_DIR="$HOME/.clis-code/home"
-HOST_PROJECTS_ROOT="${CLIS_PROJECTS_ROOT:-/mnt/c/dev}"
 CONTAINER_PROJECTS_DIR="/home/dev/projects"
 
 mkdir -p "$HOST_SKILLS_DIR" "$HOST_HOME_DIR"
@@ -38,6 +37,22 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "Crealo desde .env.example y configurá TS_AUTHKEY." >&2
     exit 1
 fi
+
+# --- Cargar variables del .env en este shell (Compose ya lo recibe vía --env-file) ---
+# Solo KEY=VALUE simples; ignoramos líneas vacías y comentarios.
+set +e
+while IFS='=' read -r _key _value; do
+    [[ -z "$_key" || "$_key" =~ ^[[:space:]]*# ]] && continue
+    # Quitar espacios alrededor de la clave y eventuales comillas del valor.
+    _key="${_key//[[:space:]]/}"
+    case "$_value" in
+        \"*\"|\'*\') _value="${_value:1:${#_value}-2}" ;;
+    esac
+    export "$_key=$_value"
+done < "$ENV_FILE"
+set -e
+
+HOST_PROJECTS_ROOT="${CLIS_PROJECTS_ROOT:-/mnt/c/dev}"
 
 if [[ ! -d "$HOST_PROJECTS_ROOT" ]]; then
     echo "Error: la raíz de proyectos no existe: $HOST_PROJECTS_ROOT" >&2
