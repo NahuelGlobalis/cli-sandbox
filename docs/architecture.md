@@ -37,12 +37,17 @@ Este es el servicio al que se conecta Moshi. Su comando principal es
 
 ## Sesiones efimeras de clis
 
-El script `clis` ejecuta `docker compose run --rm --no-deps clis-code` y:
+El script `clis` levanta los servicios con Compose y crea la sesion efimera con
+`docker run`. La sesion reutiliza los mounts de `clis-code` mediante
+`--volumes-from` y se adjunta al namespace de `clis-tailscale`. Ademas:
 
 - Monta la raiz compartida `CLIS_PROJECTS_ROOT` (`/mnt/c/dev` por defecto).
 - Conserva el subdirectorio actual como working directory.
 - Comparte red, home, credenciales, skills y Docker socket con Compose.
 - Inicia primero el sidecar y exige `BackendState=Running`.
+- Asegura que el servicio persistente `clis-code` quede levantado (con `sshd`
+  corriendo) para que Moshi siempre tenga a quien conectarse, incluso cuando
+  solo se invoca `clis`.
 - Define `CLIS_REMOTE_SERVICES=0` para no arrancar otro SSH ni otro daemon de
   Moshi en el mismo namespace de red.
 

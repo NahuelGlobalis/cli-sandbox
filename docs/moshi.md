@@ -3,7 +3,9 @@
 ## Requisitos
 
 - `clis-tailscale` aprobado y en estado `Running`.
-- `clis-code` levantado y sano.
+- `clis-code` levantado y sano. Invocar `clis` lo asegura automaticamente: ademas
+  de la sesion efimera, arranca el servicio persistente y espera a que `sshd`
+  escuche en el puerto 22 del tailnet.
 - Tailscale activo en el telefono con la misma cuenta o tailnet.
 - App Moshi instalada.
 

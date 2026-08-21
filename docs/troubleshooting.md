@@ -46,6 +46,20 @@ Comprueba:
 docker compose exec -T tailscale tailscale status --json
 ```
 
+## Invalid cluster node al iniciar clis
+
+Compose 2.7 puede fallar al crear un contenedor efimero con
+`network_mode: service:tailscale` sobre Docker 27:
+
+```text
+Error response from daemon: invalid cluster node while attaching to network
+```
+
+El script `clis` evita esa combinacion: usa Compose para asegurar los servicios
+persistentes y `docker run` para adjuntar la sesion al namespace de Tailscale.
+Actualiza el script instalado si una copia anterior todavia usa
+`docker compose run`.
+
 ## NeedsMachineAuth
 
 El nodo esta registrado pero pendiente de aprobacion. Aprueba `clis-code` en

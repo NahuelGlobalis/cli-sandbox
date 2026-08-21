@@ -95,14 +95,17 @@ COMPOSE_ARGS=(
     --project-directory "$CLIS_REPO_DIR"
 )
 RUN_ARGS=(
-    run --rm --no-deps
+    run --rm --init -i
+    --name "clis-code-run-$$"
+    --volumes-from clis-code
+    --network container:clis-tailscale
     -e CLIS_REMOTE_SERVICES=0
     -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
     -w "$CONTAINER_WD"
 )
 
-if [[ ! -t 0 || ! -t 1 ]]; then
-    RUN_ARGS+=(-T)
+if [[ -t 0 && -t 1 ]]; then
+    RUN_ARGS+=(-t)
 fi
 
 # --- SSH agent forwarding (si el agent está activo en el host) ---
@@ -167,4 +170,26 @@ if [[ "$TAILSCALE_STATE" != "Running" ]]; then
     exit 1
 fi
 
-docker "${COMPOSE_ARGS[@]}" "${RUN_ARGS[@]}" clis-code "${CMD_ARGS[@]}"
+# --- Asegurar el servicio persistente que recibe Moshi/SSH ---
+# `clis` abre sesiones efímeras con CLIS_REMOTE_SERVICES=0, pero Moshi se
+# conecta al servicio persistente `clis-code` (sleep infinity + sshd +
+# moshi-hook). Lo arrancamos aquí para que el teléfono siempre tenga a quién
+# conectarse, incluso cuando solo se invoca clis. `up -d` es idempotente.
+docker "${COMPOSE_ARGS[@]}" up -d clis-code >/dev/null
+PERSISTENT_READY=""
+for _ in {1..30}; do
+    if docker exec clis-code pgrep -x sshd >/dev/null 2>&1; then
+        PERSISTENT_READY=1
+        break
+    fi
+    sleep 1
+done
+if [[ -z "$PERSISTENT_READY" ]]; then
+    echo "WARN: el servicio persistente clis-code no arrancó sshd a tiempo." >&2
+    echo "Moshi podría no conectar. Revisá: docker compose --file $COMPOSE_FILE logs clis-code" >&2
+fi
+
+# Compose 2.7 no puede crear un one-off con `network_mode: service:tailscale`
+# sobre Docker 27. Reutilizar los mounts del servicio persistente evita
+# duplicar la configuración y adjunta la sesión al mismo namespace de red.
+docker "${RUN_ARGS[@]}" "$IMAGE" "${CMD_ARGS[@]}"
