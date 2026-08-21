@@ -63,6 +63,35 @@ fi
 HOST_PROJECTS_ROOT="$(cd "$HOST_PROJECTS_ROOT" && pwd -P)"
 export CLIS_PROJECTS_ROOT="$HOST_PROJECTS_ROOT"
 
+# --- Ejecutar Compose desde el repositorio aunque clis se invoque desde otro cwd ---
+COMPOSE_ARGS=(
+    compose
+    --file "$COMPOSE_FILE"
+    --env-file "$ENV_FILE"
+    --project-directory "$CLIS_REPO_DIR"
+)
+
+UP_ONLY=0
+case "${1:-}" in
+    down)
+        [[ $# -eq 1 ]] || { echo "Error: clis down no acepta argumentos." >&2; exit 2; }
+        mapfile -t SESSION_CONTAINERS < <(
+            docker ps -aq --filter 'name=clis-code-run-'
+        )
+        if [[ ${#SESSION_CONTAINERS[@]} -gt 0 ]]; then
+            docker rm -f "${SESSION_CONTAINERS[@]}" >/dev/null
+        fi
+        docker "${COMPOSE_ARGS[@]}" down
+        echo "clis-code detenido; los volúmenes y la identidad de Tailscale se conservaron."
+        exit 0
+        ;;
+    up)
+        [[ $# -eq 1 ]] || { echo "Error: clis up no acepta argumentos." >&2; exit 2; }
+        UP_ONLY=1
+        shift
+        ;;
+esac
+
 # --- Verificar que la imagen existe ---
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "Error: la imagen '$IMAGE' no existe." >&2
@@ -70,76 +99,71 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     exit 1
 fi
 
-# --- Conservar la ubicación dentro de la raíz de proyectos compartida ---
-HOST_CWD="$(pwd -P)"
-case "$HOST_CWD" in
-    "$HOST_PROJECTS_ROOT")
-        RELATIVE_CWD=""
-        ;;
-    "$HOST_PROJECTS_ROOT"/*)
-        RELATIVE_CWD="${HOST_CWD#"$HOST_PROJECTS_ROOT"}"
-        ;;
-    *)
-        echo "Error: el directorio actual está fuera de $HOST_PROJECTS_ROOT" >&2
-        echo "Entrá a un repo bajo esa raíz o definí CLIS_PROJECTS_ROOT." >&2
-        exit 1
-        ;;
-esac
-CONTAINER_WD="$CONTAINER_PROJECTS_DIR$RELATIVE_CWD"
-
-# --- Ejecutar el servicio Compose sobre la raíz de proyectos compartida ---
-COMPOSE_ARGS=(
-    compose
-    --file "$COMPOSE_FILE"
-    --env-file "$ENV_FILE"
-    --project-directory "$CLIS_REPO_DIR"
-)
-RUN_ARGS=(
-    run --rm --init -i
-    --name "clis-code-run-$$"
-    --volumes-from clis-code
-    --network container:clis-tailscale
-    -e CLIS_REMOTE_SERVICES=0
-    -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
-    -w "$CONTAINER_WD"
-)
-
-if [[ -t 0 && -t 1 ]]; then
-    RUN_ARGS+=(-t)
-fi
-
-# --- SSH agent forwarding (si el agent está activo en el host) ---
-if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
-    RUN_ARGS+=(
-        -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock
-        -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock
-    )
-fi
-
-# --- Parsear flags del script ---
-CMD_ARGS=()
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --port|-p)
-            [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
-            echo "Error: --port no es compatible con la red compartida de Tailscale." >&2
-            echo "Escuchá en 0.0.0.0 y accedé a clis-code:<puerto> desde el tailnet." >&2
-            exit 2
+if [[ "$UP_ONLY" == "0" ]]; then
+    # --- Conservar la ubicación dentro de la raíz de proyectos compartida ---
+    HOST_CWD="$(pwd -P)"
+    case "$HOST_CWD" in
+        "$HOST_PROJECTS_ROOT")
+            RELATIVE_CWD=""
             ;;
-        --env|-e)
-            [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
-            RUN_ARGS+=("-e" "$2")
-            shift 2
+        "$HOST_PROJECTS_ROOT"/*)
+            RELATIVE_CWD="${HOST_CWD#"$HOST_PROJECTS_ROOT"}"
             ;;
         *)
-            CMD_ARGS+=("$1")
-            shift
+            echo "Error: el directorio actual está fuera de $HOST_PROJECTS_ROOT" >&2
+            echo "Entrá a un repo bajo esa raíz o definí CLIS_PROJECTS_ROOT." >&2
+            exit 1
             ;;
     esac
-done
+    CONTAINER_WD="$CONTAINER_PROJECTS_DIR$RELATIVE_CWD"
 
-if [[ ${#CMD_ARGS[@]} -eq 0 ]]; then
-    CMD_ARGS=(/bin/bash)
+    RUN_ARGS=(
+        run --rm --init -i
+        --name "clis-code-run-$$"
+        --volumes-from clis-code
+        --network container:clis-tailscale
+        -e CLIS_REMOTE_SERVICES=0
+        -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
+        -w "$CONTAINER_WD"
+    )
+
+    if [[ -t 0 && -t 1 ]]; then
+        RUN_ARGS+=(-t)
+    fi
+
+    # --- SSH agent forwarding (si el agent está activo en el host) ---
+    if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
+        RUN_ARGS+=(
+            -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock
+            -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock
+        )
+    fi
+
+    # --- Parsear flags del script ---
+    CMD_ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --port|-p)
+                [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
+                echo "Error: --port no es compatible con la red compartida de Tailscale." >&2
+                echo "Escuchá en 0.0.0.0 y accedé a clis-code:<puerto> desde el tailnet." >&2
+                exit 2
+                ;;
+            --env|-e)
+                [[ $# -ge 2 ]] || { echo "Error: $1 requiere un valor." >&2; exit 2; }
+                RUN_ARGS+=("-e" "$2")
+                shift 2
+                ;;
+            *)
+                CMD_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    if [[ ${#CMD_ARGS[@]} -eq 0 ]]; then
+        CMD_ARGS=(/bin/bash)
+    fi
 fi
 
 # Compose considera al sidecar una dependencia, pero hacemos el arranque aquí
@@ -187,6 +211,35 @@ done
 if [[ -z "$PERSISTENT_READY" ]]; then
     echo "WARN: el servicio persistente clis-code no arrancó sshd a tiempo." >&2
     echo "Moshi podría no conectar. Revisá: docker compose --file $COMPOSE_FILE logs clis-code" >&2
+fi
+
+# Si tailscale fue reiniciado, los contenedores que compartían su namespace
+# pueden conservar una red obsoleta aunque sshd siga activo. Recrear solo el
+# servicio persistente vuelve a adjuntarlo sin tocar identidad ni volúmenes.
+TAILSCALE_IP="$(docker exec clis-code tailscale ip -4 2>/dev/null || true)"
+if [[ -n "$PERSISTENT_READY" && -n "$TAILSCALE_IP" ]] \
+    && ! docker exec clis-code timeout 2 bash -c \
+        'exec 3<>"/dev/tcp/$1/22"' _ "$TAILSCALE_IP" 2>/dev/null; then
+    echo "WARN: SSH no responde en la IP Tailscale; recreando clis-code." >&2
+    docker "${COMPOSE_ARGS[@]}" up -d --force-recreate clis-code >/dev/null
+    PERSISTENT_READY=""
+    for _ in {1..30}; do
+        TAILSCALE_IP="$(docker exec clis-code tailscale ip -4 2>/dev/null || true)"
+        if [[ -n "$TAILSCALE_IP" ]] && docker exec clis-code timeout 2 bash -c \
+            'exec 3<>"/dev/tcp/$1/22"' _ "$TAILSCALE_IP" 2>/dev/null; then
+            PERSISTENT_READY=1
+            break
+        fi
+        sleep 1
+    done
+    if [[ -z "$PERSISTENT_READY" ]]; then
+        echo "WARN: SSH sigue sin responder en la IP Tailscale." >&2
+    fi
+fi
+
+if [[ "$UP_ONLY" == "1" ]]; then
+    echo "clis-code iniciado; Tailscale y SSH están listos."
+    exit 0
 fi
 
 # Compose 2.7 no puede crear un one-off con `network_mode: service:tailscale`

@@ -81,21 +81,30 @@ Tambien se pueden sobrescribir `CLIS_COMPOSE_FILE` y `CLIS_ENV_FILE`.
 ## Uso local
 
 ```bash
+clis up
+
 cd /mnt/c/dev/repos/mi-proyecto
 clis
 clis codex
 clis opencode
 clis herdr
 clis --env API_KEY=valor comando
+
+clis down
 ```
+
+`clis up` y `clis down` pueden ejecutarse desde cualquier directorio. `down`
+cierra las sesiones efimeras y elimina los contenedores, pero conserva todos
+los volumenes, incluida la identidad de Tailscale y las claves SSH.
 
 `clis` monta la raiz de proyectos y mantiene el subdirectorio desde el que se
 invoco dentro del volumen compartido. La raiz completa `/mnt/c/dev` se monta
 en `/home/dev/projects`; por ejemplo, `/mnt/c/dev/repos/mi-proyecto` se
 convierte en `/home/dev/projects/repos/mi-proyecto`.
 
-El comando debe ejecutarse bajo `CLIS_PROJECTS_ROOT`. Para usar otra raiz,
-define la misma variable en `.env` y en el shell que ejecuta `clis`.
+Los comandos que abren una sesion deben ejecutarse bajo `CLIS_PROJECTS_ROOT`.
+Para usar otra raiz, define la misma variable en `.env` y en el shell que
+ejecuta `clis`.
 
 ## Entrar al servicio persistente
 

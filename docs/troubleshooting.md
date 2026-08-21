@@ -60,6 +60,26 @@ persistentes y `docker run` para adjuntar la sesion al namespace de Tailscale.
 Actualiza el script instalado si una copia anterior todavia usa
 `docker compose run`.
 
+## Connection refused o error 111 despues de reiniciar Tailscale
+
+Los contenedores que comparten la red de `clis-tailscale` pueden conservar un
+namespace obsoleto si el sidecar se reinicia. En ese estado Tailscale figura
+online, pero SSH rechaza conexiones y DNS puede fallar dentro de `clis-code`.
+
+Invoca `clis`: el script comprueba el puerto 22 en la IP Tailscale y recrea
+automaticamente solo `clis-code` cuando detecta este caso. La identidad de
+Tailscale, las claves SSH y el home persistente no se eliminan.
+
+Para reiniciar todo el entorno de forma ordenada:
+
+```bash
+clis down
+clis up
+```
+
+`clis down` cierra las sesiones efimeras y elimina los contenedores, pero nunca
+los volumenes.
+
 ## NeedsMachineAuth
 
 El nodo esta registrado pero pendiente de aprobacion. Aprueba `clis-code` en

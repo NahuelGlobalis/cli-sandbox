@@ -357,6 +357,10 @@ source ~/.bashrc
 ### Uso
 
 ```bash
+# Levantar o bajar todo el entorno desde cualquier directorio
+clis up
+clis down
+
 # Abrir bash interactivo en el directorio actual
 cd /mnt/c/dev/repos/mi-proyecto
 clis
@@ -377,10 +381,14 @@ clis --env API_KEY=secret opencode
 clis -e MY_VAR=value agy
 ```
 
-`clis` ejecuta una sesión efímera del servicio Compose `clis-code`. Compose
-levanta automáticamente el sidecar `clis-tailscale`, espera a que esté sano y
-comparte con la sesión su red, socket de Tailscale, Docker socket, home
-persistente, credenciales, skills y claves SSH. La raíz
+`clis up` levanta el sidecar y el servicio persistente, y valida Tailscale y
+SSH. `clis down` cierra las sesiones efimeras, elimina los contenedores sin
+borrar volumenes y conserva la identidad de Tailscale, claves y credenciales.
+
+Los demas comandos crean una sesion efimera con `docker run`. Compose levanta
+automaticamente el sidecar `clis-tailscale`, espera a que este sano y comparte
+con la sesion su red, socket de Tailscale, Docker socket, home persistente,
+credenciales, skills y claves SSH. La raiz
 `CLIS_PROJECTS_ROOT` (`/mnt/c/dev` por defecto) se monta completa en
 `/home/dev/projects`.
 
