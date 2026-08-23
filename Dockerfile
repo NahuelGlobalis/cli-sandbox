@@ -201,6 +201,11 @@ RUN for cli in devin agy opencode codex; do \
         herdr integration install "$cli" || echo "WARN: integration '$cli' no disponible"; \
     done
 
+# Hooks de Moshi para los eventos de los agentes (inicio/fin, notificaciones).
+# No requieren pairing durante la build; el token se agrega después con
+# `moshi-hook pair`. Devin aún no es un target soportado por moshi-hook.
+RUN moshi-hook install --target codex --target opencode
+
 # Playwright global y navegador Chromium.
 RUN pnpm add -g "playwright@${PLAYWRIGHT_VERSION}" \
     && playwright install chromium

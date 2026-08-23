@@ -70,8 +70,9 @@ La conexion debe usar:
 
 ## Pairing de hooks
 
-Easy Pair habilita SSH/Mosh, pero no registra automaticamente los eventos de
-agentes. Copia el token desde `Moshi > Settings > Hooks` y ejecuta:
+La imagen ya instala los hooks de Codex y OpenCode durante el build, pero no
+registra automaticamente los eventos: hace falta el token. Copia el token desde
+`Moshi > Settings > Hooks` y ejecuta:
 
 ```bash
 docker compose exec -u dev clis-code \
@@ -84,6 +85,10 @@ docker compose restart clis-code
 ```
 
 No pegues el token en issues, logs o commits.
+
+Si `moshi-hook status` muestra `stale` o `not found`, reinstala con
+`moshi-hook install --target <agente>`. Devin todavia no es un target
+soportado por moshi-hook; sus sesiones se siguen por la integracion de Herdr.
 
 ## Validar hooks y daemon
 

@@ -2,7 +2,8 @@
 
 ## Hooks de Moshi para Codex y OpenCode
 
-Instala o actualiza los hooks en el home persistente:
+La imagen instala los hooks de Codex y OpenCode durante el build. Para
+actualizarlos o repararlos en el home persistente:
 
 ```bash
 docker compose exec -u dev clis-code \
