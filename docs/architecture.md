@@ -93,3 +93,16 @@ incluir:
 - `/home/dev/.local/bin`
 
 Los cambios de PATH solo se aplican a conexiones SSH/Mosh nuevas.
+
+## SSH agent
+
+El servicio persistente monta `SSH_AUTH_SOCK` del host en
+`/run/host-services/ssh-auth.sock`. De esta forma las sesiones Moshi pueden usar
+las claves cargadas en el agent para Git sin copiar claves privadas al home ni
+montar `~/.ssh`, lo que ocultaria el `authorized_keys` de Easy Pair.
+
+Las sesiones efimeras de `clis` montan el mismo socket directamente. Si el
+socket cambia despues de reiniciar WSL o el agent, ejecuta `clis up` para que
+Compose recree el servicio con la ruta actual. `clis` debe ejecutarse en el host
+WSL: dentro del contenedor, `HOME` y `SSH_AUTH_SOCK` no son rutas validas para
+los bind mounts que resuelve el daemon Docker.

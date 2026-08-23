@@ -97,6 +97,22 @@ clis down
 cierra las sesiones efimeras y elimina los contenedores, pero conserva todos
 los volumenes, incluida la identidad de Tailscale y las claves SSH.
 
+Ejecuta siempre `clis`, incluido `clis up`, desde el host WSL. El script rechaza
+su ejecucion dentro de un contenedor para impedir que Compose use rutas internas
+como bind mounts del host y recree el home persistente o el socket SSH con una
+ruta incorrecta.
+
+Si el host tiene `SSH_AUTH_SOCK` activo, `clis up` lo reenvia al servicio
+persistente para que Git por SSH funcione tambien desde Moshi. Comprueba antes:
+
+```bash
+ssh-add -l
+clis up
+```
+
+No montes `~/.ssh` sobre `/home/dev/.ssh`: ocultaria el `authorized_keys` que
+Easy Pair mantiene para Moshi.
+
 `clis` monta la raiz de proyectos y mantiene el subdirectorio desde el que se
 invoco dentro del volumen compartido. La raiz completa `/mnt/c/dev` se monta
 en `/home/dev/projects`; por ejemplo, `/mnt/c/dev/repos/mi-proyecto` se

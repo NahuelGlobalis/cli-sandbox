@@ -20,6 +20,15 @@ CLIS_REPO_DIR="${CLIS_REPO_DIR:-$SCRIPT_DIR}"
 COMPOSE_FILE="${CLIS_COMPOSE_FILE:-$CLIS_REPO_DIR/docker-compose.yml}"
 ENV_FILE="${CLIS_ENV_FILE:-$CLIS_REPO_DIR/.env}"
 
+# Compose resuelve bind mounts en el host Docker. Desde una sesion clis, HOME y
+# SSH_AUTH_SOCK son rutas del contenedor y recrearian el servicio con mounts
+# incorrectos, incluido el home que contiene authorized_keys de Moshi.
+if [[ -f /.dockerenv ]]; then
+    echo "Error: ejecutá clis desde el host WSL, no desde dentro del contenedor." >&2
+    echo "Esto protege los mounts persistentes de credenciales, SSH y Moshi." >&2
+    exit 1
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
     echo "Error: Docker Compose v2 no está instalado." >&2
     echo "Instalalo en Ubuntu/WSL con:  sudo apt install docker-compose-v2" >&2
@@ -134,7 +143,7 @@ if [[ "$UP_ONLY" == "0" ]]; then
     # --- SSH agent forwarding (si el agent está activo en el host) ---
     if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
         RUN_ARGS+=(
-            -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock
+            -v "${SSH_AUTH_SOCK}":/tmp/ssh-agent.sock:ro
             -e SSH_AUTH_SOCK=/tmp/ssh-agent.sock
         )
     fi
@@ -192,6 +201,28 @@ if [[ "$TAILSCALE_STATE" != "Running" ]]; then
     echo "Error: Tailscale no alcanzó el estado Running (estado: ${TAILSCALE_STATE:-desconocido})." >&2
     echo "Revisá: docker compose --file $COMPOSE_FILE logs tailscale" >&2
     exit 1
+fi
+
+# --- Preservar SSH agent forwarding en `clis up` ---
+# Si SSH_AUTH_SOCK no apunta a un socket, Compose interpolaría /dev/null
+# y recrearía clis-code con forwarding roto. Reutilizar el mount existente
+# del servicio persistente evita pisar un forwarding que ya funciona.
+if [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK}" ]]; then
+    export SSH_AUTH_SOCK
+else
+    EXISTING_SOCK="$(docker inspect clis-code --format '{{range .Mounts}}{{if eq .Destination "/run/host-services/ssh-auth.sock"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)"
+    if [[ -n "${EXISTING_SOCK:-}" && "${EXISTING_SOCK}" != "/dev/null" && -S "${EXISTING_SOCK}" ]]; then
+        export SSH_AUTH_SOCK="${EXISTING_SOCK}"
+        echo "WARN: SSH_AUTH_SOCK no está activo; preservando forwarding con ${EXISTING_SOCK}" >&2
+        echo "      Iniciá el agent (eval \$(ssh-agent) && ssh-add) y re-ejecutá clis up para actualizar." >&2
+    elif [[ -n "${EXISTING_SOCK:-}" && "${EXISTING_SOCK}" != "/dev/null" ]]; then
+        export SSH_AUTH_SOCK="${EXISTING_SOCK}"
+        echo "WARN: SSH_AUTH_SOCK apunta a ${EXISTING_SOCK} pero el socket no existe (stale tras reiniciar WSL/agent)." >&2
+        echo "      Iniciá el agent y re-ejecutá clis up." >&2
+    else
+        echo "WARN: SSH_AUTH_SOCK no está definido o no es un socket; Git por SSH fallará hasta que inicies el agent." >&2
+        echo "      Ejecutá: eval \$(ssh-agent) && ssh-add && clis up" >&2
+    fi
 fi
 
 # --- Asegurar el servicio persistente que recibe Moshi/SSH ---

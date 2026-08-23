@@ -110,6 +110,24 @@ docker compose exec -u dev -it clis-code \
 Selecciona MagicDNS, escanea el QR y espera la confirmacion. Usa el usuario
 `dev`, conexion `Auto` y no actives Tailscale SSH.
 
+## Git por SSH no carga las claves
+
+Comprueba que el agent del host tenga claves y vuelve a aplicar su socket al
+servicio persistente. Ejecuta estos comandos en el host WSL, no dentro de una
+sesion `clis`:
+
+```bash
+ssh-add -l
+clis up
+docker compose exec -u dev clis-code ssh-add -l
+```
+
+`clis` reenvia el socket del agent; no copia claves privadas ni monta el
+directorio `~/.ssh` del host. Si `ssh-add -l` falla en el host, inicia o carga
+primero tu agent. Si solo falla dentro del contenedor, el socket probablemente
+cambio despues de reiniciar WSL; `clis up` recrea el servicio con la ruta
+actual.
+
 ## Comando no encontrado desde Moshi
 
 Las conexiones abiertas antes de actualizar `sshd_config` conservan el PATH

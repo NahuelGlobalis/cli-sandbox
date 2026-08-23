@@ -56,6 +56,7 @@ services:
       - XDG_DATA_HOME=/home/dev/.local/share
       - TZ=UTC
       - TAILSCALE_SOCKET=/var/run/tailscale/tailscaled.sock
+      - SSH_AUTH_SOCK=/run/host-services/ssh-auth.sock
       - MOSHI_HOOK_AUTOSTART=1
       # Git: identidad (sobreescribe .gitconfig del host sin modificarlo)
       - GIT_AUTHOR_NAME=nahuel.cano
@@ -65,6 +66,9 @@ services:
     volumes:
       # Docker: montar el socket del host para usar el daemon desde dentro
       - /var/run/docker.sock:/var/run/docker.sock
+      # Reenviar el agent permite usar las claves cargadas sin copiar claves
+      # privadas ni ocultar el authorized_keys persistente de Moshi.
+      - ${SSH_AUTH_SOCK:-/dev/null}:/run/host-services/ssh-auth.sock:ro
       # Home completo: persiste configs, credenciales y la authorized_keys que
       # Easy Pair crea para el celular.
       - ${HOME}/.clis-code/home:/home/dev
