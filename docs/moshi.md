@@ -130,3 +130,27 @@ moshi .
 
 Esto es distinto de una sesion Herdr. Consulta
 [Agentes y Herdr](agents-and-herdr.md) para compartir Herdr entre PC y telefono.
+
+## Moshi Free y Herdr
+
+Moshi Free usa SSH y no incluye la integracion de multiplexores ni el
+auto-attach de Herdr. Si la app cierra la conexion, Herdr sigue ejecutando los
+agentes en el servidor, pero la conexion siguiente abre un shell nuevo. Para
+volver a la sesion persistente ejecuta:
+
+```bash
+herdr
+```
+
+O, para una sesion con nombre:
+
+```bash
+herdr session attach <nombre>
+```
+
+Esto no indica que Herdr haya perdido la sesion. Confirma que sigue viva con
+`herdr status server` y `herdr session list`. El auto-attach despues de una
+reconexion y el transporte Mosh son funciones de Moshi Pro. En Free, bloquear
+el telefono, suspender la app o cambiar entre Wi-Fi y datos puede cortar SSH y
+reiniciar todo el shell visible, no solo Herdr. Ejecuta cualquier trabajo que
+deba sobrevivir dentro de Herdr o tmux.

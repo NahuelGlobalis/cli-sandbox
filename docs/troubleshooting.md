@@ -74,7 +74,7 @@ Para reiniciar todo el entorno de forma ordenada:
 
 ```bash
 clis down
-clis up
+clis up -d
 ```
 
 `clis down` cierra las sesiones efimeras y elimina los contenedores, pero nunca
@@ -118,14 +118,14 @@ sesion `clis`:
 
 ```bash
 ssh-add -l
-clis up
+clis up -d
 docker compose exec -u dev clis-code ssh-add -l
 ```
 
 `clis` reenvia el socket del agent; no copia claves privadas ni monta el
 directorio `~/.ssh` del host. Si `ssh-add -l` falla en el host, inicia o carga
 primero tu agent. Si solo falla dentro del contenedor, el socket probablemente
-cambio despues de reiniciar WSL; `clis up` recrea el servicio con la ruta
+cambio despues de reiniciar WSL; `clis up -d` recrea el servicio con la ruta
 actual.
 
 ## Comando no encontrado desde Moshi
@@ -171,6 +171,19 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 Si el servidor vivia en un contenedor `clis-code-run-*` que ya termino, la
 sesion no puede recuperarse como proceso activo. Crea una nueva sesion con
 nombre y manten vivo el contenedor que aloja el servidor.
+
+Si `herdr status server` indica `running` pero una conexion nueva de Moshi abre
+un shell normal, la sesion no se perdio. Ejecuta `herdr` o
+`herdr session attach <nombre>` para volver a adjuntarla. Moshi Free no incluye
+el selector de multiplexores ni el auto-attach despues de reconectar; esas
+funciones requieren Pro.
+
+Si tambien se reinicia el shell normal, comprueba primero `docker inspect
+clis-code --format '{{.RestartCount}}'`. Un valor `0` indica que el servidor no
+se reinicio: la conexion SSH del telefono se corto. En Moshi Free esto puede
+ocurrir al suspender la app o cambiar de red; Mosh, que conserva el transporte
+en esos casos, es una funcion Pro. Usa Herdr o tmux para que los procesos
+importantes sobrevivan y vuelve a adjuntar manualmente despues de reconectar.
 
 Si una integracion esta `outdated`:
 

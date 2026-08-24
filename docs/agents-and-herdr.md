@@ -114,6 +114,11 @@ herdr session attach default
 Funciona, pero los nombres por proyecto son mas claros cuando hay varias
 sesiones entre PC y telefono.
 
+Desconectar el cliente no detiene el servidor Herdr. En una conexion SSH nueva,
+`herdr` vuelve a adjuntar la sesion `default`; `herdr session attach <nombre>`
+hace lo mismo con una sesion nombrada. Moshi Free requiere este paso manual,
+porque el selector de multiplexores y el auto-attach son funciones Pro.
+
 ## Diferencia con moshi punto
 
 - `moshi .` crea o adjunta una sesion tmux para el directorio actual.

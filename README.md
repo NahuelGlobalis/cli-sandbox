@@ -357,8 +357,16 @@ source ~/.bashrc
 ### Uso
 
 ```bash
-# Levantar o bajar todo el entorno desde cualquier directorio
+# Construir la imagen
+clis build
+
+# Levantar el entorno y entrar al contenedor persistente
 clis up
+
+# Levantar el entorno en segundo plano y volver al host
+clis up -d
+
+# Bajar todo el entorno desde cualquier directorio
 clis down
 
 # Abrir bash interactivo en el directorio actual
@@ -381,9 +389,12 @@ clis --env API_KEY=secret opencode
 clis -e MY_VAR=value agy
 ```
 
-`clis up` levanta el sidecar y el servicio persistente, y valida Tailscale y
-SSH. `clis down` cierra las sesiones efimeras, elimina los contenedores sin
-borrar volumenes y conserva la identidad de Tailscale, claves y credenciales.
+`clis build` construye la imagen `clis-code:latest`. `clis up` levanta el
+sidecar y el servicio persistente, valida Tailscale y SSH, y abre Bash dentro
+del servicio persistente. Con `clis up -d` realiza el arranque en segundo plano
+y vuelve al host. `clis down` cierra las sesiones efimeras, elimina los
+contenedores sin borrar volumenes y conserva la identidad de Tailscale, claves
+y credenciales.
 
 Los demas comandos crean una sesion efimera con `docker run`. Compose levanta
 automaticamente el sidecar `clis-tailscale`, espera a que este sano y comparte

@@ -35,6 +35,9 @@ Tailscale + Moshi
 Este es el servicio al que se conecta Moshi. Su comando principal es
 `sleep infinity`; los daemons se inician desde `entrypoint.sh`.
 
+`clis up` inicia y valida los servicios, y luego abre Bash en este contenedor.
+`clis up -d` realiza el mismo arranque sin entrar al contenedor.
+
 ## Sesiones efimeras de clis
 
 El script `clis` levanta los servicios con Compose y crea la sesion efimera con
@@ -103,6 +106,7 @@ montar `~/.ssh`, lo que ocultaria el `authorized_keys` de Easy Pair.
 
 Las sesiones efimeras de `clis` montan el mismo socket directamente. Si el
 socket cambia despues de reiniciar WSL o el agent, ejecuta `clis up` para que
-Compose recree el servicio con la ruta actual. `clis` debe ejecutarse en el host
-WSL: dentro del contenedor, `HOME` y `SSH_AUTH_SOCK` no son rutas validas para
-los bind mounts que resuelve el daemon Docker.
+Compose recree el servicio con la ruta actual; usa `clis up -d` si no necesitas
+entrar. `clis` debe ejecutarse en el host WSL: dentro del contenedor, `HOME` y
+`SSH_AUTH_SOCK` no son rutas validas para los bind mounts que resuelve el daemon
+Docker.

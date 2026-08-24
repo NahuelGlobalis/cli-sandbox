@@ -80,8 +80,14 @@ COMPOSE_ARGS=(
     --project-directory "$CLIS_REPO_DIR"
 )
 
-UP_ONLY=0
+UP_MODE=0
+UP_DETACHED=0
 case "${1:-}" in
+    build)
+        [[ $# -eq 1 ]] || { echo "Error: clis build no acepta argumentos." >&2; exit 2; }
+        docker "${COMPOSE_ARGS[@]}" build clis-code
+        exit 0
+        ;;
     down)
         [[ $# -eq 1 ]] || { echo "Error: clis down no acepta argumentos." >&2; exit 2; }
         mapfile -t SESSION_CONTAINERS < <(
@@ -95,9 +101,13 @@ case "${1:-}" in
         exit 0
         ;;
     up)
-        [[ $# -eq 1 ]] || { echo "Error: clis up no acepta argumentos." >&2; exit 2; }
-        UP_ONLY=1
         shift
+        UP_MODE=1
+        if [[ ${1:-} == "-d" ]]; then
+            UP_DETACHED=1
+            shift
+        fi
+        [[ $# -eq 0 ]] || { echo "Error: uso: clis up [-d]" >&2; exit 2; }
         ;;
 esac
 
@@ -108,7 +118,7 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ "$UP_ONLY" == "0" ]]; then
+if [[ "$UP_MODE" == "0" ]]; then
     # --- Conservar la ubicación dentro de la raíz de proyectos compartida ---
     HOST_CWD="$(pwd -P)"
     case "$HOST_CWD" in
@@ -214,14 +224,14 @@ else
     if [[ -n "${EXISTING_SOCK:-}" && "${EXISTING_SOCK}" != "/dev/null" && -S "${EXISTING_SOCK}" ]]; then
         export SSH_AUTH_SOCK="${EXISTING_SOCK}"
         echo "WARN: SSH_AUTH_SOCK no está activo; preservando forwarding con ${EXISTING_SOCK}" >&2
-        echo "      Iniciá el agent (eval \$(ssh-agent) && ssh-add) y re-ejecutá clis up para actualizar." >&2
+        echo "      Iniciá el agent (eval \$(ssh-agent) && ssh-add) y re-ejecutá clis up -d para actualizar." >&2
     elif [[ -n "${EXISTING_SOCK:-}" && "${EXISTING_SOCK}" != "/dev/null" ]]; then
         export SSH_AUTH_SOCK="${EXISTING_SOCK}"
         echo "WARN: SSH_AUTH_SOCK apunta a ${EXISTING_SOCK} pero el socket no existe (stale tras reiniciar WSL/agent)." >&2
-        echo "      Iniciá el agent y re-ejecutá clis up." >&2
+        echo "      Iniciá el agent y re-ejecutá clis up -d." >&2
     else
         echo "WARN: SSH_AUTH_SOCK no está definido o no es un socket; Git por SSH fallará hasta que inicies el agent." >&2
-        echo "      Ejecutá: eval \$(ssh-agent) && ssh-add && clis up" >&2
+        echo "      Ejecutá: eval \$(ssh-agent) && ssh-add && clis up -d" >&2
     fi
 fi
 
@@ -268,8 +278,19 @@ if [[ -n "$PERSISTENT_READY" && -n "$TAILSCALE_IP" ]] \
     fi
 fi
 
-if [[ "$UP_ONLY" == "1" ]]; then
+if [[ "$UP_MODE" == "1" ]]; then
     echo "clis-code iniciado; Tailscale y SSH están listos."
+    if [[ "$UP_DETACHED" == "1" ]]; then
+        exit 0
+    fi
+
+    EXEC_ARGS=(exec -u dev)
+    if [[ -t 0 && -t 1 ]]; then
+        EXEC_ARGS+=(-it)
+    else
+        EXEC_ARGS+=(-T)
+    fi
+    docker "${COMPOSE_ARGS[@]}" "${EXEC_ARGS[@]}" clis-code /bin/bash
     exit 0
 fi
 

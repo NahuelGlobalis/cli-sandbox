@@ -81,7 +81,13 @@ Tambien se pueden sobrescribir `CLIS_COMPOSE_FILE` y `CLIS_ENV_FILE`.
 ## Uso local
 
 ```bash
+clis build
+
+# Inicia los servicios y abre Bash en clis-code.
 clis up
+
+# Inicia los servicios y vuelve al host.
+clis up -d
 
 cd /mnt/c/dev/repos/mi-proyecto
 clis
@@ -93,9 +99,11 @@ clis --env API_KEY=valor comando
 clis down
 ```
 
-`clis up` y `clis down` pueden ejecutarse desde cualquier directorio. `down`
-cierra las sesiones efimeras y elimina los contenedores, pero conserva todos
-los volumenes, incluida la identidad de Tailscale y las claves SSH.
+`clis build`, `clis up` y `clis down` pueden ejecutarse desde cualquier
+directorio. `clis up` entra al servicio persistente; agrega `-d` para volver al
+host despues del arranque. `down` cierra las sesiones efimeras y elimina los
+contenedores, pero conserva todos los volumenes, incluida la identidad de
+Tailscale y las claves SSH.
 
 Ejecuta siempre `clis`, incluido `clis up`, desde el host WSL. El script rechaza
 su ejecucion dentro de un contenedor para impedir que Compose use rutas internas
@@ -107,7 +115,7 @@ persistente para que Git por SSH funcione tambien desde Moshi. Comprueba antes:
 
 ```bash
 ssh-add -l
-clis up
+clis up -d
 ```
 
 No montes `~/.ssh` sobre `/home/dev/.ssh`: ocultaria el `authorized_keys` que
