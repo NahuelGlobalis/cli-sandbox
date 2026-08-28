@@ -366,8 +366,11 @@ clis up
 # Levantar el entorno en segundo plano y volver al host
 clis up -d
 
-# Bajar todo el entorno desde cualquier directorio
+# Bajar clis-code pero mantener Tailscale activo
 clis down
+
+# Bajar todo el entorno (incluye Tailscale) desde cualquier directorio
+clis down --all
 
 # Abrir bash interactivo en el directorio actual
 cd /mnt/c/dev/repos/mi-proyecto
@@ -392,9 +395,10 @@ clis -e MY_VAR=value agy
 `clis build` construye la imagen `clis-code:latest`. `clis up` levanta el
 sidecar y el servicio persistente, valida Tailscale y SSH, y abre Bash dentro
 del servicio persistente. Con `clis up -d` realiza el arranque en segundo plano
-y vuelve al host. `clis down` cierra las sesiones efimeras, elimina los
-contenedores sin borrar volumenes y conserva la identidad de Tailscale, claves
-y credenciales.
+y vuelve al host. `clis down` cierra las sesiones efimeras y detiene
+`clis-code` sin borrar volumenes, pero mantiene Tailscale activo para no
+perder la identidad del nodo; `clis down --all` detiene tambien Tailscale.
+En ambos casos se conservan la identidad de Tailscale, claves y credenciales.
 
 Los demas comandos crean una sesion efimera con `docker run`. Compose levanta
 automaticamente el sidecar `clis-tailscale`, espera a que este sano y comparte

@@ -89,15 +89,34 @@ case "${1:-}" in
         exit 0
         ;;
     down)
-        [[ $# -eq 1 ]] || { echo "Error: clis down no acepta argumentos." >&2; exit 2; }
+        DOWN_ALL=0
+        shift
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --all)
+                    DOWN_ALL=1
+                    shift
+                    ;;
+                *)
+                    echo "Error: clis down no acepta el argumento '$1'." >&2
+                    echo "Uso: clis down [--all]" >&2
+                    exit 2
+                    ;;
+            esac
+        done
         mapfile -t SESSION_CONTAINERS < <(
             docker ps -aq --filter 'name=clis-code-run-'
         )
         if [[ ${#SESSION_CONTAINERS[@]} -gt 0 ]]; then
             docker rm -f "${SESSION_CONTAINERS[@]}" >/dev/null
         fi
-        docker "${COMPOSE_ARGS[@]}" down
-        echo "clis-code detenido; los volúmenes y la identidad de Tailscale se conservaron."
+        if [[ "$DOWN_ALL" == "1" ]]; then
+            docker "${COMPOSE_ARGS[@]}" down
+            echo "clis-code detenido por completo (incluye Tailscale); los volúmenes y la identidad de Tailscale se conservaron."
+        else
+            docker "${COMPOSE_ARGS[@]}" stop clis-code >/dev/null
+            echo "clis-code detenido; Tailscale sigue activo. Usá 'clis down --all' para detener también Tailscale."
+        fi
         exit 0
         ;;
     up)

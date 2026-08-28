@@ -73,12 +73,13 @@ Tailscale, las claves SSH y el home persistente no se eliminan.
 Para reiniciar todo el entorno de forma ordenada:
 
 ```bash
-clis down
+clis down --all
 clis up -d
 ```
 
-`clis down` cierra las sesiones efimeras y elimina los contenedores, pero nunca
-los volumenes.
+`clis down` cierra las sesiones efimeras y detiene `clis-code` sin tocar
+Tailscale; `clis down --all` detiene tambien Tailscale. Ninguno borra
+volumenes.
 
 ## NeedsMachineAuth
 

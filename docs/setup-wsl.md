@@ -97,13 +97,15 @@ clis herdr
 clis --env API_KEY=valor comando
 
 clis down
+clis down --all
 ```
 
 `clis build`, `clis up` y `clis down` pueden ejecutarse desde cualquier
 directorio. `clis up` entra al servicio persistente; agrega `-d` para volver al
-host despues del arranque. `down` cierra las sesiones efimeras y elimina los
-contenedores, pero conserva todos los volumenes, incluida la identidad de
-Tailscale y las claves SSH.
+host despues del arranque. `clis down` cierra las sesiones efimeras y detiene
+`clis-code`, pero mantiene Tailscale activo para no perder la identidad del
+nodo; `clis down --all` detiene tambien Tailscale. Ambos conservan todos los
+volumenes, incluida la identidad de Tailscale y las claves SSH.
 
 Ejecuta siempre `clis`, incluido `clis up`, desde el host WSL. El script rechaza
 su ejecucion dentro de un contenedor para impedir que Compose use rutas internas
