@@ -119,7 +119,18 @@ WORKDIR /home/dev
 RUN git config --global user.email "nahuelcano@gmail.com" \
     && git config --global user.name "Nahuel Cano"
 
-RUN pnpm config set global-bin-dir /opt/pnpm-global/bin
+RUN pnpm config set global-bin-dir /opt/pnpm-global/bin \
+    && mkdir -p "$(pnpm root -g)" \
+    && printf '%s\n' \
+        'onlyBuiltDependencies:' \
+        '  - opencode-ai' \
+        '  - opencode' \
+        '' \
+        'allowBuilds:' \
+        '  opencode-ai: true' \
+        '  opencode: true' \
+        > "$(pnpm root -g)/pnpm-workspace.yaml" \
+    && ln -sf "$(pnpm root -g)/pnpm-workspace.yaml" /opt/pnpm-global/pnpm-workspace.yaml
 
 # Devin no debe guardar su binario dentro del directorio de credenciales montable.
 # El manifest remoto invalida la caché cuando se publica una versión nueva.
@@ -152,12 +163,10 @@ RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
     && ln -sf /opt/antigravity/bin/agy /home/dev/.local/bin/agy \
     && rm -f /tmp/antigravity-latest.json
 
-# OpenCode: se desactivan los scripts automáticos para ejecutar postinstall una sola vez.
+# OpenCode: los scripts de ciclo de vida se permiten solo para opencode vía pnpm-workspace.yaml.
 ADD --chown=dev:dev https://registry.npmjs.org/opencode-ai/latest /tmp/opencode-latest.json
-RUN pnpm add -g --ignore-scripts "opencode-ai@${OPENCODE_VERSION}" \
-    && OPENCODE_DIR="$(dirname "$(find /opt/pnpm-global -name "postinstall.mjs" -path "*opencode*" | head -1)")" \
-    && test -f "${OPENCODE_DIR}/postinstall.mjs" \
-    && node "${OPENCODE_DIR}/postinstall.mjs" \
+RUN pnpm add -g "opencode-ai@${OPENCODE_VERSION}" \
+    && opencode --version \
     && rm -f /tmp/opencode-latest.json
 
 # Codex CLI de OpenAI.
