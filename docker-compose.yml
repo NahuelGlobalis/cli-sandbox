@@ -25,6 +25,12 @@ services:
       timeout: 5s
       retries: 12
       start_period: 10s
+    # Moshi Desktop (web UI 24544) corre en clis-code, pero comparte este
+    # namespace de red. Publicar aqui el puerto es la unica forma de exponerlo
+    # cuando el host no esta en el tailnet. Se vincula a 127.0.0.1 para no
+    # exponerlo a la LAN: solo el host puede alcanzarlo.
+    ports:
+      - "127.0.0.1:24544:24544"
     restart: unless-stopped
 
   clis-code:
@@ -56,7 +62,11 @@ services:
       - XDG_DATA_HOME=/home/dev/.local/share
       - TZ=UTC
       - TAILSCALE_SOCKET=/var/run/tailscale/tailscaled.sock
-      - SSH_AUTH_SOCK=/run/host-services/ssh-auth.sock
+      # El entrypoint arranca un ssh-agent interno en /tmp/clis-ssh-agent.sock y
+      # carga las claves del host desde /home/dev/.git-ssh. Así Git por SSH no
+      # depende del agent del host y no se monta ~/.ssh sobre /home/dev/.ssh
+      # (lo que ocultaría el authorized_keys persistente de Easy Pair/Moshi).
+      - SSH_AUTH_SOCK=/tmp/clis-ssh-agent.sock
       - MOSHI_HOOK_AUTOSTART=1
       # Git: identidad (sobreescribe .gitconfig del host sin modificarlo)
       - GIT_AUTHOR_NAME=nahuel.cano
@@ -66,9 +76,10 @@ services:
     volumes:
       # Docker: montar el socket del host para usar el daemon desde dentro
       - /var/run/docker.sock:/var/run/docker.sock
-      # Reenviar el agent permite usar las claves cargadas sin copiar claves
-      # privadas ni ocultar el authorized_keys persistente de Moshi.
-      - ${SSH_AUTH_SOCK:-/dev/null}:/run/host-services/ssh-auth.sock:ro
+      # Claves SSH del host en un volumen separado y de solo lectura. El
+      # entrypoint carga las privadas en un ssh-agent interno; así no se monta
+      # ~/.ssh sobre /home/dev/.ssh y el authorized_keys de Moshi se conserva.
+      - ${HOME}/.ssh:/home/dev/.git-ssh:ro
       # Home completo: persiste configs, credenciales y la authorized_keys que
       # Easy Pair crea para el celular.
       - ${HOME}/.clis-code/home:/home/dev
@@ -76,8 +87,8 @@ services:
       - ssh-host-keys:/var/lib/ssh
       # Skills compartidas con el host en lectura y escritura.
       - ${HOME}/.agents/skills:/home/dev/.agents/skills
-      # Git se comparte en modo lectura. ~/.ssh del host no se monta: Moshi usa
-      # una clave exclusiva generada en el teléfono.
+      # Git se comparte en modo lectura. ~/.ssh del host se monta como .git-ssh
+      # (arriba) y se carga en el agent interno; nunca sobre /home/dev/.ssh.
       - ${HOME}/.gitconfig:/home/dev/.gitconfig:ro
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
       # Todos los repos comparten la misma ruta en sesiones locales y remotas.

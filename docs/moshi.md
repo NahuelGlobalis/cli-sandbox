@@ -52,6 +52,11 @@ El QR aparece en esa terminal. En Moshi:
 Moshi genera una clave Ed25519 en el telefono. Solo la clave publica se agrega
 a `/home/dev/.ssh/authorized_keys`.
 
+Las claves SSH del host para Git se montan aparte en `/home/dev/.git-ssh`
+(read-only) y se cargan en un `ssh-agent` interno, no sobre `/home/dev/.ssh`.
+Asi el `authorized_keys` de Easy Pair nunca queda oculto. Ver
+[Arquitectura > SSH agent](architecture.md#ssh-agent).
+
 ## Validar el login
 
 ```bash
@@ -130,6 +135,36 @@ moshi .
 
 Esto es distinto de una sesion Herdr. Consulta
 [Agentes y Herdr](agents-and-herdr.md) para compartir Herdr entre PC y telefono.
+
+## Moshi Desktop en el host
+
+Moshi Desktop (la web UI en `24544`) esta pensada para correr en la maquina
+donde estas sentado, no en el host remoto. Si el host WSL/Windows no esta en el
+tailnet, la unica forma de alcanzar la web UI desde el browser del host es
+publicar el puerto en localhost.
+
+El Compose publica `127.0.0.1:24544:24544` desde el servicio `tailscale`, que
+comparte el namespace de red con `clis-code`. Como el puerto se vincula a
+`127.0.0.1`, solo el host puede alcanzarlo; no se expone a la LAN.
+
+Desktop escucha en `127.0.0.1` por defecto. Para que el puerto publicado lo
+alcance, hay que iniciarla escuchando en todas las interfaces:
+
+```bash
+# WSL host
+docker compose exec -u dev clis-code moshi --listen 0.0.0.0:24544 --no-open
+```
+
+Luego abre `http://localhost:24544` en el browser del host. `--no-open` evita
+que Desktop intente lanzar un browser dentro del contenedor.
+
+El daemon (`moshi-hook serve`, gateway en `127.0.0.1:24543`) sigue en loopback y
+no se publica: Desktop lo alcanza directamente porque corre en el mismo
+contenedor.
+
+Advertencia de seguridad: quien alcance `localhost:24544` en el host tiene
+control total sobre los agentes del contenedor. No expongas este puerto a la
+red; el bind a `127.0.0.1` ya lo previene.
 
 ## Moshi Free y Herdr
 

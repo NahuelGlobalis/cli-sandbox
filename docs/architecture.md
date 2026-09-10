@@ -13,6 +13,12 @@ El Compose define dos servicios:
 mismo namespace de red, por lo que SSH, Mosh y cualquier servidor iniciado en
 `clis-code` quedan disponibles en la IP Tailscale sin publicar puertos Docker.
 
+La unica excepcion es Moshi Desktop: su web UI escucha en `24544` y, como el
+host no esta en el tailnet, el puerto se publica desde el servicio `tailscale`
+vinculado a `127.0.0.1` (`127.0.0.1:24544:24544`). Asi el browser del host lo
+alcanza en `http://localhost:24544` sin exponerlo a la LAN. Ver
+[Moshi](moshi.md#moshi-desktop-en-el-host).
+
 ```text
 Telefono                       WSL / Docker
 Tailscale + Moshi              
@@ -64,6 +70,7 @@ persistente que recibe las conexiones del telefono.
 | `~/.clis-code/home` | `/home/dev` | Credenciales, hooks y sockets |
 | `/mnt/c/dev` | `/home/dev/projects` | Todos los repos de trabajo |
 | `~/.agents/skills` | `/home/dev/.agents/skills` | Skills compartidas |
+| `~/.ssh` | `/home/dev/.git-ssh` | Claves SSH del host (solo lectura) |
 | `tailscale-state` | `/var/lib/tailscale` | Identidad del nodo |
 | `tailscale-socket` | `/var/run/tailscale` | Socket del daemon Tailscale |
 | `ssh-host-keys` | `/var/lib/ssh` | Identidad estable de OpenSSH |
@@ -99,14 +106,24 @@ Los cambios de PATH solo se aplican a conexiones SSH/Mosh nuevas.
 
 ## SSH agent
 
-El servicio persistente monta `SSH_AUTH_SOCK` del host en
-`/run/host-services/ssh-auth.sock`. De esta forma las sesiones Moshi pueden usar
-las claves cargadas en el agent para Git sin copiar claves privadas al home ni
-montar `~/.ssh`, lo que ocultaria el `authorized_keys` de Easy Pair.
+Las claves SSH del host se montan en `/home/dev/.git-ssh` (read-only), no sobre
+`/home/dev/.ssh`: esto conserva el `authorized_keys` persistente que Easy Pair
+crea para el teléfono. El `entrypoint.sh` arranca un `ssh-agent` interno en
+`/tmp/clis-ssh-agent.sock` y carga las claves privadas (`id_ed25519`, `id_rsa`,
+etc.) de ese directorio. `SSH_AUTH_SOCK` apunta al socket interno, así Git por
+SSH funciona sin depender de que el agent del host esté activo.
 
-Las sesiones efimeras de `clis` montan el mismo socket directamente. Si el
-socket cambia despues de reiniciar WSL o el agent, ejecuta `clis up` para que
-Compose recree el servicio con la ruta actual; usa `clis up -d` si no necesitas
-entrar. `clis` debe ejecutarse en el host WSL: dentro del contenedor, `HOME` y
-`SSH_AUTH_SOCK` no son rutas validas para los bind mounts que resuelve el daemon
-Docker.
+Cada contenedor (el persistente y cada sesión efímera de `clis`) ejecuta el
+entrypoint y obtiene su propio agent. Las sesiones remotas por Moshi/SSH reciben
+la misma ruta mediante `SetEnv` en `sshd_config.d/99-clis-code.conf`.
+
+Notas:
+
+- Las claves con passphrase no se cargan (el entrypoint no puede pedirla sin
+  colgar); dejalas sin passphrase o cargalas a mano con `ssh-add` dentro de la
+  sesión.
+- El `known_hosts` del host se enlaza en `/home/dev/.ssh/known_hosts` (si no
+  existe ya) para que Git/SSH verifique hosts sin prompt.
+- Ya no se reenvía `SSH_AUTH_SOCK` del host. Si necesitás claves que solo viven
+  en el agent del host (p. ej. hardware tokens), copialas a `~/.ssh` o montalas
+  en `.git-ssh`.

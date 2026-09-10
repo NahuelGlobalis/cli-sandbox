@@ -113,21 +113,35 @@ Selecciona MagicDNS, escanea el QR y espera la confirmacion. Usa el usuario
 
 ## Git por SSH no carga las claves
 
-Comprueba que el agent del host tenga claves y vuelve a aplicar su socket al
-servicio persistente. Ejecuta estos comandos en el host WSL, no dentro de una
-sesion `clis`:
+Las claves del host se montan en `/home/dev/.git-ssh` (read-only) y el
+entrypoint las carga en un `ssh-agent` interno en `/tmp/clis-ssh-agent.sock`.
+Comprueba desde el host WSL:
 
 ```bash
-ssh-add -l
-clis up -d
 docker compose exec -u dev clis-code ssh-add -l
+docker compose exec clis-code ls -l /home/dev/.git-ssh
+docker compose exec clis-code printenv SSH_AUTH_SOCK
 ```
 
-`clis` reenvia el socket del agent; no copia claves privadas ni monta el
-directorio `~/.ssh` del host. Si `ssh-add -l` falla en el host, inicia o carga
-primero tu agent. Si solo falla dentro del contenedor, el socket probablemente
-cambio despues de reiniciar WSL; `clis up -d` recrea el servicio con la ruta
-actual.
+Si `ssh-add -l` muestra `The agent has no identities`:
+
+- Verifica que `~/.ssh` del host contenga las claves privadas (`id_ed25519`,
+  `id_rsa`, etc.).
+- Las claves con **passphrase** no se cargan automáticamente (el entrypoint no
+  puede pedirla sin colgar). Cargalas a mano dentro de la sesión:
+
+  ```bash
+  ssh-add /home/dev/.git-ssh/id_ed25519
+  ```
+
+- Si el agent interno no arrancó, recrea el servicio:
+
+  ```bash
+  clis up -d
+  ```
+
+`clis` debe ejecutarse en el host WSL: dentro del contenedor, `HOME` no es una
+ruta válida para el bind mount de `~/.ssh` que resuelve el daemon Docker.
 
 ## Comando no encontrado desde Moshi
 

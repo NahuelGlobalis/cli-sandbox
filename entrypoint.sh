@@ -60,6 +60,46 @@ if [[ -n "${TAILSCALE_SOCKET:-}" ]]; then
     fi
 fi
 
+# SSH agent interno: las claves del host se montan en /home/dev/.git-ssh
+# (read-only) y se cargan en un ssh-agent propio. Así Git por SSH funciona sin
+# depender del agent del host ni montar ~/.ssh sobre /home/dev/.ssh, lo que
+# ocultaría el authorized_keys persistente que Easy Pair crea para Moshi.
+# Corre en el persistente y en las sesiones efímeras de `clis` (ambas ejecutan
+# este entrypoint); cada contenedor obtiene su propio agent en /tmp.
+if [[ -d /home/dev/.git-ssh ]]; then
+    rm -f /tmp/clis-ssh-agent.sock
+    gosu dev ssh-agent -a /tmp/clis-ssh-agent.sock >/dev/null 2>&1 &
+    for _ in {1..20}; do
+        [[ -S /tmp/clis-ssh-agent.sock ]] && break
+        sleep 0.1
+    done
+    if [[ -S /tmp/clis-ssh-agent.sock ]]; then
+        export SSH_AUTH_SOCK=/tmp/clis-ssh-agent.sock
+        for _key in id_ed25519 id_ecdsa id_rsa id_dsa; do
+            _keyfile="/home/dev/.git-ssh/${_key}"
+            if [[ -f "$_keyfile" ]]; then
+                # SSH_ASKPASS_REQUIRE=force evita colgar pidiendo passphrase en
+                # el tty: las claves con passphrase se omiten con warning.
+                if SSH_ASKPASS=/bin/false SSH_ASKPASS_REQUIRE=force \
+                        gosu dev ssh-add "$_keyfile" </dev/null >/dev/null 2>&1; then
+                    :
+                else
+                    echo "WARN: no se pudo cargar ${_keyfile} (¿passphrase? el agent del host ya no se reenvía)." >&2
+                fi
+            fi
+        done
+        # known_hosts del host para que Git/SSH verifique hosts sin prompt.
+        if [[ -f /home/dev/.git-ssh/known_hosts && ! -e /home/dev/.ssh/known_hosts ]]; then
+            install -d -m 0700 -o dev -g dev /home/dev/.ssh
+            ln -s /home/dev/.git-ssh/known_hosts /home/dev/.ssh/known_hosts
+        fi
+    else
+        echo "WARN: no se pudo iniciar el ssh-agent interno en /tmp/clis-ssh-agent.sock." >&2
+    fi
+else
+    echo "WARN: /home/dev/.git-ssh no existe; Git por SSH no tendrá claves del host." >&2
+fi
+
 # Las sesiones efímeras creadas por `clis` comparten la red de Tailscale con el
 # servicio persistente, por lo que no deben intentar ocupar otra vez sus puertos.
 if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
