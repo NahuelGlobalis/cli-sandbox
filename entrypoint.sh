@@ -75,17 +75,21 @@ if [[ -d /home/dev/.git-ssh ]]; then
     done
     if [[ -S /tmp/clis-ssh-agent.sock ]]; then
         export SSH_AUTH_SOCK=/tmp/clis-ssh-agent.sock
-        for _key in id_ed25519 id_ecdsa id_rsa id_dsa; do
-            _keyfile="/home/dev/.git-ssh/${_key}"
-            if [[ -f "$_keyfile" ]]; then
-                # SSH_ASKPASS_REQUIRE=force evita colgar pidiendo passphrase en
-                # el tty: las claves con passphrase se omiten con warning.
-                if SSH_ASKPASS=/bin/false SSH_ASKPASS_REQUIRE=force \
-                        gosu dev ssh-add "$_keyfile" </dev/null >/dev/null 2>&1; then
-                    :
-                else
-                    echo "WARN: no se pudo cargar ${_keyfile} (¿passphrase? el agent del host ya no se reenvía)." >&2
-                fi
+        # Cargar toda clave privada del host, sin depender del nombre estándar:
+        # además de id_ed25519/id_rsa, el host suele usar nombres propios
+        # (p. ej. personal, botsmza) para distintas cuentas de Git.
+        for _keyfile in /home/dev/.git-ssh/*; do
+            [[ -f "$_keyfile" ]] || continue
+            case "$_keyfile" in
+                *.pub|*known_hosts*|*/config|*/authorized_keys) continue ;;
+            esac
+            # SSH_ASKPASS_REQUIRE=force evita colgar pidiendo passphrase en
+            # el tty: las claves con passphrase se omiten con warning.
+            if SSH_ASKPASS=/bin/false SSH_ASKPASS_REQUIRE=force \
+                    gosu dev ssh-add "$_keyfile" </dev/null >/dev/null 2>&1; then
+                :
+            else
+                echo "WARN: no se pudo cargar ${_keyfile} (¿passphrase? el agent del host ya no se reenvía)." >&2
             fi
         done
         # known_hosts del host para que Git/SSH verifique hosts sin prompt.

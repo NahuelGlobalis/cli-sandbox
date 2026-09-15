@@ -109,8 +109,9 @@ Los cambios de PATH solo se aplican a conexiones SSH/Mosh nuevas.
 Las claves SSH del host se montan en `/home/dev/.git-ssh` (read-only), no sobre
 `/home/dev/.ssh`: esto conserva el `authorized_keys` persistente que Easy Pair
 crea para el teléfono. El `entrypoint.sh` arranca un `ssh-agent` interno en
-`/tmp/clis-ssh-agent.sock` y carga las claves privadas (`id_ed25519`, `id_rsa`,
-etc.) de ese directorio. `SSH_AUTH_SOCK` apunta al socket interno, así Git por
+`/tmp/clis-ssh-agent.sock` y carga todas las claves privadas de ese directorio
+(cualquier nombre: `id_ed25519`, `id_rsa`, `personal`, `botsmza`, etc.), no solo
+las de nombre estándar. `SSH_AUTH_SOCK` apunta al socket interno, así Git por
 SSH funciona sin depender de que el agent del host esté activo.
 
 Cada contenedor (el persistente y cada sesión efímera de `clis`) ejecuta el

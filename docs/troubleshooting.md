@@ -125,8 +125,9 @@ docker compose exec clis-code printenv SSH_AUTH_SOCK
 
 Si `ssh-add -l` muestra `The agent has no identities`:
 
-- Verifica que `~/.ssh` del host contenga las claves privadas (`id_ed25519`,
-  `id_rsa`, etc.).
+- Verifica que `~/.ssh` del host contenga las claves privadas. Se cargan con
+  cualquier nombre (`id_ed25519`, `id_rsa`, `personal`, `botsmza`, etc.); los
+  archivos `*.pub`, `known_hosts*`, `config` y `authorized_keys` se ignoran.
 - Las claves con **passphrase** no se cargan automáticamente (el entrypoint no
   puede pedirla sin colgar). Cargalas a mano dentro de la sesión:
 
