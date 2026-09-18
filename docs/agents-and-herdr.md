@@ -47,6 +47,46 @@ docker compose exec -u dev clis-code \
 
 Reinstala solo las que indique el comando.
 
+## Sidebar de Herdr
+
+La imagen instala `alexarthurs/herdr-sidebar/plugins/herdr-sidebar`. En un home
+nuevo, el sidebar no se abre automaticamente y este atajo lo abre o cierra:
+
+```text
+prefix+alt+s
+```
+
+Primero pulsa el prefijo predeterminado de Herdr (`Ctrl+B`) y luego `Alt+S`.
+La accion configurada es:
+
+```bash
+herdr plugin action invoke herdr-sidebar.open-sidebar
+```
+
+El plugin, su estado y el atajo se guardan en el home persistente. Si ese home
+ya existia antes de actualizar la imagen, instala el plugin manualmente:
+
+```bash
+docker compose exec -u dev clis-code \
+  herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar
+```
+
+Agrega el bloque siguiente a `/home/dev/.config/herdr/config.toml` si todavia
+no existe y desactiva **Auto-open sidebar** desde los ajustes del plugin:
+
+```toml
+[[keys.command]]
+key = "prefix+alt+s"
+type = "shell"
+command = "herdr plugin action invoke herdr-sidebar.open-sidebar"
+```
+
+Recarga Herdr despues de cambiar la configuracion:
+
+```bash
+herdr server reload-config
+```
+
 ## Sesiones con nombre
 
 Usa nombres explicitos para reconocer el mismo workspace desde ambos

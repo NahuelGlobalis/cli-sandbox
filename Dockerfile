@@ -203,6 +203,25 @@ RUN MOSHI_HOOK_VERSION="$(tr -d '[:space:]' </tmp/moshi-hook-latest.txt)" \
 
 USER dev
 
+RUN herdr plugin install --yes alexarthurs/herdr-sidebar/plugins/herdr-sidebar \
+    && mkdir -p /home/dev/.local/state/herdr/plugins/herdr-sidebar \
+    && printf '%s\n' \
+        '{"merged":true,"active":"explorer","hotkeys":false,"font_prompt":true,"auto_open":false,"strict_toggle":false,"focus_on_open":true,"follow_cwd":true,"git_deco":true,"dock_right":false,"sidebar_width":32,"colors":"vscode","preview_placement":"tab"}' \
+        > /home/dev/.local/state/herdr/plugins/herdr-sidebar/state.json \
+    && printf '%s\n' \
+        '[ui.toast]' \
+        'delivery = "system"' \
+        '' \
+        '[[keys.command]]' \
+        'key = "prefix+alt+s"' \
+        'type = "shell"' \
+        'command = "herdr plugin action invoke herdr-sidebar.open-sidebar"' \
+        '' \
+        '[theme]' \
+        'name = "catppuccin"' \
+        'auto_switch = false' \
+        > "${HERDR_CONFIG_PATH}"
+
 # Registrar las CLIs del Dockerfile como integraciones de Herdr.
 # Las integraciones opcionales agregan estado y restauración de sesiones
 # cuando el agente lo admite. Se instalan tras el binario de Herdr.
@@ -235,7 +254,10 @@ RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /tmp/google-
 # pueda sincronizarla cuando el volume del home está vacío (primer arranque).
 RUN cp -a /home/dev /home/dev-skel \
     && rm -rf /home/dev-skel/.cache /home/dev-skel/.local/state \
-    && mkdir -p /home/dev-skel/.cache /home/dev-skel/.local/state \
+    && mkdir -p /home/dev-skel/.cache \
+        /home/dev-skel/.local/state/herdr/plugins/herdr-sidebar \
+    && cp /home/dev/.local/state/herdr/plugins/herdr-sidebar/state.json \
+        /home/dev-skel/.local/state/herdr/plugins/herdr-sidebar/state.json \
     && chown -R dev:dev /home/dev-skel
 
 USER dev
