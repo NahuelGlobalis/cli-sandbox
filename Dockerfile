@@ -203,7 +203,7 @@ RUN MOSHI_HOOK_VERSION="$(tr -d '[:space:]' </tmp/moshi-hook-latest.txt)" \
 
 USER dev
 
-RUN herdr plugin install --yes alexarthurs/herdr-sidebar/plugins/herdr-sidebar \
+RUN herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --yes \
     && mkdir -p /home/dev/.local/state/herdr/plugins/herdr-sidebar \
     && printf '%s\n' \
         '{"merged":true,"active":"explorer","hotkeys":false,"font_prompt":true,"auto_open":false,"strict_toggle":false,"focus_on_open":true,"follow_cwd":true,"git_deco":true,"dock_right":false,"sidebar_width":32,"colors":"vscode","preview_placement":"tab"}' \
