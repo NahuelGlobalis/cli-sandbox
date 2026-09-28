@@ -37,6 +37,11 @@ docker compose exec -u dev clis-code herdr integration status
 Los hooks de Moshi y las integraciones de Herdr pueden coexistir. Verifica
 `moshi-hook status` despues de reinstalar una integracion.
 
+El entrypoint del servicio persistente reinstala estas integraciones en cada
+arranque, de forma idempotente, para que un home creado antes de la imagen no
+quede con versiones viejas. Los comandos manuales siguen siendo utiles para
+forzar una reinstalacion o para inspeccionar el estado.
+
 Una nueva version de Herdr puede marcar integraciones persistidas como
 `outdated`:
 
@@ -71,8 +76,9 @@ docker compose exec -u dev clis-code \
   herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar
 ```
 
-Agrega el bloque siguiente a `/home/dev/.config/herdr/config.toml` si todavia
-no existe y desactiva **Auto-open sidebar** desde los ajustes del plugin:
+El entrypoint agrega el atajo a `/home/dev/.config/herdr/config.toml` en cada
+arranque si todavia no esta, asi que un home viejo lo recibe sin intervencion.
+El bloque que agrega es:
 
 ```toml
 [[keys.command]]
@@ -80,6 +86,9 @@ key = "prefix+alt+s"
 type = "shell"
 command = "herdr plugin action invoke herdr-sidebar.open-sidebar"
 ```
+
+Desactiva **Auto-open sidebar** desde los ajustes del plugin. En un home nuevo
+ya viene desactivado.
 
 Recarga Herdr despues de cambiar la configuracion:
 

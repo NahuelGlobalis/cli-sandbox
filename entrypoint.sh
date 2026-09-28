@@ -8,6 +8,33 @@ rsync -a --ignore-existing /home/dev-skel/ /home/dev/
 # Corregir ownership sin recorrer mounts anidados como projects o skills.
 find /home/dev -xdev -exec chown dev:dev {} + 2>/dev/null || true
 
+# Herdr: la config y las integraciones viven en el home persistente, que puede
+# ser anterior a la imagen. El skeleton solo popula un home vacío, así que
+# reconciliar aquí, de forma idempotente, lo que el build ya deja en la imagen.
+if command -v herdr >/dev/null 2>&1; then
+    HERDR_CFG="${HERDR_CONFIG_PATH:-/home/dev/.config/herdr/config.toml}"
+    HERDR_KEYS=/usr/local/share/clis-code/herdr-keys.toml
+    if [[ -f "$HERDR_KEYS" && -f "$HERDR_CFG" ]]; then
+        # flock evita un doble append si dos contenedores arrancan a la vez.
+        (
+            flock 9
+            if ! grep -q 'herdr-sidebar.open-sidebar' "$HERDR_CFG"; then
+                cat "$HERDR_KEYS" >> "$HERDR_CFG"
+            fi
+        ) 9>>"$HERDR_CFG"
+        chown dev:dev "$HERDR_CFG"
+    fi
+    # Solo el servicio persistente instala integraciones: las sesiones efímeras
+    # comparten el mismo home y no deben reescribirlas en paralelo.
+    if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
+        # Herdr exige que exista el directorio de config de cada CLI.
+        gosu dev mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config
+        for _cli in devin antigravity-cli opencode codex; do
+            gosu dev herdr integration install "$_cli" >/dev/null 2>&1 || true
+        done
+    fi
+fi
+
 # Generar claves de host SSH persistentes en el primer arranque. Se guardan
 # fuera de la imagen para que Moshi no vea una identidad distinta al recrear
 # el contenedor.

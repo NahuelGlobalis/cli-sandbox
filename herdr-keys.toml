@@ -1,0 +1,7 @@
+# Atajo del sidebar de Herdr. Fuente unica: el build lo usa como config inicial
+# y el entrypoint lo agrega a homes persistentes anteriores a la imagen.
+
+[[keys.command]]
+key = "prefix+alt+s"
+type = "shell"
+command = "herdr plugin action invoke herdr-sidebar.open-sidebar"

@@ -203,6 +203,10 @@ RUN MOSHI_HOOK_VERSION="$(tr -d '[:space:]' </tmp/moshi-hook-latest.txt)" \
 
 USER dev
 
+# Atajo del sidebar compartido: el build lo usa para la config inicial y el
+# entrypoint lo agrega a homes persistentes creados antes de esta imagen.
+COPY --chown=dev:dev herdr-keys.toml /usr/local/share/clis-code/herdr-keys.toml
+
 RUN herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --yes \
     && mkdir -p /home/dev/.local/state/herdr/plugins/herdr-sidebar \
     && printf '%s\n' \
@@ -212,20 +216,19 @@ RUN herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --yes \
         '[ui.toast]' \
         'delivery = "system"' \
         '' \
-        '[[keys.command]]' \
-        'key = "prefix+alt+s"' \
-        'type = "shell"' \
-        'command = "herdr plugin action invoke herdr-sidebar.open-sidebar"' \
-        '' \
         '[theme]' \
         'name = "catppuccin"' \
         'auto_switch = false' \
-        > "${HERDR_CONFIG_PATH}"
+        > "${HERDR_CONFIG_PATH}" \
+    && cat /usr/local/share/clis-code/herdr-keys.toml >> "${HERDR_CONFIG_PATH}"
 
 # Registrar las CLIs del Dockerfile como integraciones de Herdr.
 # Las integraciones opcionales agregan estado y restauración de sesiones
-# cuando el agente lo admite. Se instalan tras el binario de Herdr.
-RUN for cli in devin agy opencode codex; do \
+# cuando el agente lo admite. Se instalan tras el binario de Herdr. Herdr
+# exige que el directorio de config de cada CLI ya exista (normalmente lo crea
+# la CLI en su primer uso), así que se precrean aquí.
+RUN mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config \
+    && for cli in devin antigravity-cli opencode codex; do \
         herdr integration install "$cli" || echo "WARN: integration '$cli' no disponible"; \
     done
 
