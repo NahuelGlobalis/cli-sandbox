@@ -152,6 +152,19 @@ opencode auth login
 
 O configura providers directamente con `/connect` dentro de la TUI.
 
+La imagen instala OpenCode v2 (`@opencode/cli`). Para exponer su interfaz web
+dentro del tailnet:
+
+```bash
+opencode web --hostname 0.0.0.0 --port 4096
+```
+
+Como `clis-code` comparte la red con `clis-tailscale`, la web queda accesible
+desde cualquier dispositivo del tailnet en `http://clis-code:4096` (o la IP
+Tailscale del nodo) sin publicar puertos Docker. El servidor imprime una
+contraseña al arrancar; también puedes fijarla con
+`OPENCODE_SERVER_PASSWORD`.
+
 ## Usar Herdr
 
 Inicia Herdr desde cualquier proyecto:

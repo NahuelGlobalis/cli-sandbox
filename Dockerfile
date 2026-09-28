@@ -123,12 +123,10 @@ RUN pnpm config set global-bin-dir /opt/pnpm-global/bin \
     && mkdir -p "$(pnpm root -g)" \
     && printf '%s\n' \
         'onlyBuiltDependencies:' \
-        '  - opencode-ai' \
-        '  - opencode' \
+        '  - "@opencode/cli"' \
         '' \
         'allowBuilds:' \
-        '  opencode-ai: true' \
-        '  opencode: true' \
+        '  "@opencode/cli": true' \
         > "$(pnpm root -g)/pnpm-workspace.yaml" \
     && ln -sf "$(pnpm root -g)/pnpm-workspace.yaml" /opt/pnpm-global/pnpm-workspace.yaml
 
@@ -163,9 +161,9 @@ RUN curl -fsSL https://antigravity.google/cli/install.sh | bash \
     && ln -sf /opt/antigravity/bin/agy /home/dev/.local/bin/agy \
     && rm -f /tmp/antigravity-latest.json
 
-# OpenCode: los scripts de ciclo de vida se permiten solo para opencode vía pnpm-workspace.yaml.
-ADD --chown=dev:dev https://registry.npmjs.org/opencode-ai/latest /tmp/opencode-latest.json
-RUN pnpm add -g "opencode-ai@${OPENCODE_VERSION}" \
+# OpenCode v2: los scripts de ciclo de vida se permiten solo para opencode vía pnpm-workspace.yaml.
+ADD --chown=dev:dev https://registry.npmjs.org/@opencode%2Fcli/latest /tmp/opencode-latest.json
+RUN pnpm add -g "@opencode/cli@${OPENCODE_VERSION}" \
     && opencode --version \
     && rm -f /tmp/opencode-latest.json
 
