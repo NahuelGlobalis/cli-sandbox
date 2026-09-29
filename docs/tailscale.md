@@ -48,6 +48,32 @@ tailscale ip -4
 
 El cliente usa `/var/run/tailscale/tailscaled.sock`, compartido con el sidecar.
 
+## Exit node
+
+Para que todo el trafico del nodo salga por un exit node del tailnet, define
+`TAILSCALE_EXIT_NODE` en `.env` con el nombre o la IP 100.x del nodo:
+
+```text
+TAILSCALE_EXIT_NODE=mi-exit-node
+```
+
+Compose lo convierte en `TS_EXTRA_ARGS=--exit-node=...` para el sidecar. Si la
+variable esta vacia, el nodo usa su salida directa y no pasa ningun argumento
+extra.
+
+El exit node elegido debe estar anunciando `--advertise-exit-node` y aprobado
+en Tailscale Admin. Como `clis-code` comparte la red del sidecar, las sesiones
+`clis`, SSH y Moshi heredan esa salida.
+
+Si el nodo ya estaba registrado, `TS_AUTH_ONCE=true` puede impedir que el
+`tailscale up` del arranque reaplique el cambio. Aplicalo a mano:
+
+```bash
+docker compose exec tailscale tailscale set --exit-node=mi-exit-node
+# para quitarlo:
+docker compose exec tailscale tailscale set --exit-node=
+```
+
 ## MagicDNS
 
 Para conexiones remotas usa el nombre completo mostrado por `tailscale status`,

@@ -139,6 +139,14 @@ if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
     mkdir -p /run/sshd
     /usr/sbin/sshd
 
+    # Cron: el archivo del repo siembra el crontab del usuario dev. Los
+    # agentes agregan tareas editandolo y recargando con `crontab`.
+    cron
+    if [[ -f /etc/clis-code/crontab ]]; then
+        gosu dev crontab /etc/clis-code/crontab \
+            || echo "WARN: no se pudo cargar /etc/clis-code/crontab." >&2
+    fi
+
     # El daemon mantiene las notificaciones y vistas de agentes. Antes de hacer
     # pair puede quedar esperando configuración o terminar sin afectar SSH/Mosh.
     if [[ "${MOSHI_HOOK_AUTOSTART:-1}" == "1" ]]; then

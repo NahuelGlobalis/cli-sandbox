@@ -11,6 +11,9 @@ services:
       TS_USERSPACE: "false"
       TS_ACCEPT_DNS: "true"
       TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-clis-code}
+      # Si TAILSCALE_EXIT_NODE esta definida, todo el trafico del nodo sale por
+      # ese exit node. Vacia, el nodo usa su salida directa.
+      TS_EXTRA_ARGS: ${TAILSCALE_EXIT_NODE:+--exit-node=${TAILSCALE_EXIT_NODE}}
     volumes:
       - tailscale-state:/var/lib/tailscale
       - tailscale-socket:/var/run/tailscale
@@ -93,6 +96,11 @@ services:
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
       # Todos los repos comparten la misma ruta en sesiones locales y remotas.
       - ${CLIS_PROJECTS_ROOT:-/mnt/c/dev}:/home/dev/projects
+      # Crontab del repo (formato de crontab de usuario). El entrypoint lo carga
+      # con `crontab` al arrancar; los agentes editan este archivo (writable)
+      # y recargan con `crontab /etc/clis-code/crontab`. Solo corre en el
+      # servicio persistente; las sesiones de `clis` no arrancan el daemon.
+      - ./crontab:/etc/clis-code/crontab
     command: ["sleep", "infinity"]
 
 volumes:

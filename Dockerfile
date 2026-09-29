@@ -47,7 +47,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl wget ca-certificates git gnupg unzip xz-utils openssh-client openssh-server \
         build-essential libssl-dev pkg-config \
-        vim nano htop procps tree gosu rsync mosh tmux \
+        vim nano htop procps tree gosu rsync mosh tmux cron \
         fonts-liberation fonts-noto-color-emoji xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/ssh/ssh_host_* \

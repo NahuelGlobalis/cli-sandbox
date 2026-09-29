@@ -1,0 +1,18 @@
+# Crontab del usuario dev. El entrypoint lo carga al arrancar el servicio
+# persistente (`crontab /etc/clis-code/crontab`); las sesiones efimeras de
+# `clis` no arrancan el daemon cron.
+#
+# Para agregar o cambiar tareas, edita este archivo (dentro del contenedor es
+# /etc/clis-code/crontab, writable) y recarga con:
+#
+#   crontab /etc/clis-code/crontab
+#
+# El bind mount es por inode: edita en el lugar o usa `>>`; no reemplaces el
+# archivo por uno nuevo. Los cambios en el spool hechos con `crontab -e` no
+# vuelven al repo ni sobreviven a la recreacion del contenedor.
+#
+# Los jobs corren con un entorno minimo (PATH=/usr/bin:/bin); usa rutas
+# absolutas o redefine PATH en este archivo si una tarea lo necesita.
+#
+# m h dom mon dow command
+# 0 * * * * echo "tick" >> /home/dev/.local/state/clis-cron.log

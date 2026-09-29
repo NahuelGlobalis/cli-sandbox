@@ -36,6 +36,7 @@ Tailscale + Moshi
 - OpenSSH en el puerto 22 del tailnet.
 - Mosh en su rango UDP normal.
 - `moshi-hook serve` y su WebSocket hacia Moshi.
+- `cron` con el crontab del usuario dev (sembrado desde `./crontab`).
 - Home y claves de host persistentes.
 
 Este es el servicio al que se conecta Moshi. Su comando principal es
@@ -74,6 +75,7 @@ persistente que recibe las conexiones del telefono.
 | `tailscale-state` | `/var/lib/tailscale` | Identidad del nodo |
 | `tailscale-socket` | `/var/run/tailscale` | Socket del daemon Tailscale |
 | `ssh-host-keys` | `/var/lib/ssh` | Identidad estable de OpenSSH |
+| `./crontab` | `/etc/clis-code/crontab` | Tareas programadas; el entrypoint las carga con `crontab` y los agentes las editan y recargan |
 
 La ruta relativa se conserva. Por ejemplo,
 `/mnt/c/dev/repos/publics/cli-sandbox` se abre como
