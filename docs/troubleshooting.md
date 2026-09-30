@@ -89,6 +89,13 @@ El nodo esta registrado pero pendiente de aprobacion. Aprueba `clis-code` en
 El contenedor puede reiniciarse periodicamente mientras espera. No borres el
 volumen de estado ni generes keys nuevas para resolver una aprobacion pendiente.
 
+## Exit node: waiting advertising
+
+El portal espera que el daemon anuncie las rutas de salida. Consulta
+[modos, diagnostico y aprobacion manual](tailscale.md#aprobacion-y-portal).
+La aprobacion del dispositivo y la autorizacion como exit node son distintas;
+no recrees la identidad para resolverlas.
+
 ## Moshi muestra login error
 
 Verifica primero que el telefono aparezca `active` en `tailscale status`.

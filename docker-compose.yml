@@ -11,9 +11,11 @@ services:
       TS_USERSPACE: "false"
       TS_ACCEPT_DNS: "true"
       TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-clis-code}
-      # Si TAILSCALE_EXIT_NODE esta definida, todo el trafico del nodo sale por
-      # ese exit node. Vacia, el nodo usa su salida directa.
-      TS_EXTRA_ARGS: ${TAILSCALE_EXIT_NODE:+--exit-node=${TAILSCALE_EXIT_NODE}}
+      # Flags explicitos tambien para limpiar preferencias del modo anterior.
+      TS_EXTRA_ARGS: --advertise-exit-node=${TAILSCALE_ADVERTISE_EXIT_NODE:-false} --exit-node=${TAILSCALE_EXIT_NODE:-} --exit-node-allow-lan-access=${TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS:-false}
+      CLIS_TS_ADVERTISE_EXIT_NODE: ${TAILSCALE_ADVERTISE_EXIT_NODE:-false}
+      CLIS_TS_EXIT_NODE: ${TAILSCALE_EXIT_NODE:-}
+      CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS: ${TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS:-false}
     volumes:
       - tailscale-state:/var/lib/tailscale
       - tailscale-socket:/var/run/tailscale
@@ -22,8 +24,23 @@ services:
       - NET_RAW
     devices:
       - /dev/net/tun:/dev/net/tun
+    # Forwarding limitado al namespace compartido, no al host WSL.
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv6.conf.all.forwarding: "1"
     healthcheck:
-      test: ["CMD-SHELL", "tailscale status --json | grep -q '\"BackendState\":[[:space:]]*\"Running\"'"]
+      # containerboot no reaplica TS_EXTRA_ARGS con TS_AUTH_ONCE=true.
+      # Reconciliar antes de marcar healthy; rechazar modos simultaneos.
+      test:
+        - CMD-SHELL
+        - >-
+          test "$${CLIS_TS_ADVERTISE_EXIT_NODE}" = false || test -z "$${CLIS_TS_EXIT_NODE}" || exit 1;
+          test -n "$${CLIS_TS_EXIT_NODE}" || test "$${CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS}" = false || exit 1;
+          tailscale set
+          --advertise-exit-node="$${CLIS_TS_ADVERTISE_EXIT_NODE}"
+          --exit-node="$${CLIS_TS_EXIT_NODE}"
+          --exit-node-allow-lan-access="$${CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS}"
+          && tailscale status --json | grep -q '"BackendState":[[:space:]]*"Running"'
       interval: 10s
       timeout: 5s
       retries: 12

@@ -13,6 +13,12 @@ El Compose define dos servicios:
 mismo namespace de red, por lo que SSH, Mosh y cualquier servidor iniciado en
 `clis-code` quedan disponibles en la IP Tailscale sin publicar puertos Docker.
 
+Compose habilita forwarding IPv4/IPv6 solo en ese namespace para poder anunciar
+un exit node, con las capacidades existentes. El host WSL no se reconfigura.
+El healthcheck reconcilia las preferencias exit node por env antes de exigir
+`BackendState=Running`. Los [modos Tailscale](tailscale.md#exit-node) afectan
+tambien a `clis-code` y las sesiones efimeras, no a la salida del host.
+
 La unica excepcion es Moshi Desktop: su web UI escucha en `24544` y, como el
 host no esta en el tailnet, el puerto se publica desde el servicio `tailscale`
 vinculado a `127.0.0.1` (`127.0.0.1:24544:24544`). Asi el browser del host lo

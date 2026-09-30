@@ -10,8 +10,8 @@ detalle la configuracion de WSL, Tailscale, Moshi y las sesiones compartidas.
    entre el contenedor persistente y las sesiones de `clis`.
 2. [Instalacion en WSL](setup-wsl.md): requisitos, build, Compose e instalacion
    del comando `clis`.
-3. [Tailscale](tailscale.md): auth key, aprobacion, MagicDNS y exposicion de
-   servicios al tailnet.
+3. [Tailscale](tailscale.md): auth key, aprobacion, modos exit node, MagicDNS y
+   exposicion de servicios al tailnet.
 4. [Moshi](moshi.md): Easy Pair, QR, SSH/Mosh, hooks y validacion.
 5. [Agentes y Herdr](agents-and-herdr.md): Codex, OpenCode, integraciones y
    sesiones compartidas entre PC y celular.
