@@ -86,8 +86,11 @@ volumenes.
 El nodo esta registrado pero pendiente de aprobacion. Aprueba `clis-code` en
 [Tailscale Admin > Machines](https://login.tailscale.com/admin/machines).
 
-El contenedor puede reiniciarse periodicamente mientras espera. No borres el
-volumen de estado ni generes keys nuevas para resolver una aprobacion pendiente.
+El sidecar permanece activo y comprueba el estado cada 10 segundos; `clis`
+espera y continua automaticamente al aprobarlo. Puede figurar `unhealthy`
+hasta llegar a `Running`, sin reiniciarse por ese motivo. Si Compose termino
+por dependencia no saludable, repite `docker compose up -d` tras aprobarlo.
+No borres el volumen de estado ni generes keys nuevas para resolver la espera.
 
 ## Exit node: waiting advertising
 

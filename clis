@@ -203,26 +203,43 @@ fi
 # para poder informar claramente si el tailnet exige aprobar el dispositivo.
 docker "${COMPOSE_ARGS[@]}" up -d tailscale >/dev/null
 TAILSCALE_STATE=""
-for _ in {1..30}; do
+TAILSCALE_READY=0
+TAILSCALE_ATTEMPTS=0
+TAILSCALE_APPROVAL_NOTICE=0
+while true; do
     TAILSCALE_STATE="$(
         docker "${COMPOSE_ARGS[@]}" exec -T tailscale tailscale status --json 2>/dev/null \
-            | sed -n 's/.*"BackendState":[[:space:]]*"\([^"]*\)".*/\1/p'
+            | sed -n 's/.*"BackendState":[[:space:]]*"\([^"]*\)".*/\1/p' || true
     )"
     case "$TAILSCALE_STATE" in
         Running)
-            break
+            # Tras una espera larga puede seguir unhealthy hasta el proximo
+            # healthcheck. Compose rechazaria iniciar clis-code en ese lapso.
+            if [[ "$(docker inspect --format '{{.State.Health.Status}}' clis-tailscale 2>/dev/null || true)" == healthy ]]; then
+                TAILSCALE_READY=1
+                break
+            fi
             ;;
         NeedsMachineAuth)
-            echo "Error: el nodo clis-code espera aprobación en Tailscale Admin > Machines." >&2
-            echo "Aprobalo en https://login.tailscale.com/admin y volvé a ejecutar clis." >&2
-            exit 1
+            if [[ "$TAILSCALE_APPROVAL_NOTICE" == "0" ]]; then
+                echo "El nodo clis-code espera aprobación en Tailscale Admin > Machines." >&2
+                echo "Aprobalo en https://login.tailscale.com/admin; comprobando cada 10 segundos (Ctrl+C para salir)." >&2
+                TAILSCALE_APPROVAL_NOTICE=1
+            fi
+            TAILSCALE_ATTEMPTS=0
+            sleep 10
+            continue
             ;;
     esac
+    TAILSCALE_ATTEMPTS=$((TAILSCALE_ATTEMPTS + 1))
+    if [[ "$TAILSCALE_ATTEMPTS" -ge 30 ]]; then
+        break
+    fi
     sleep 1
 done
 
-if [[ "$TAILSCALE_STATE" != "Running" ]]; then
-    echo "Error: Tailscale no alcanzó el estado Running (estado: ${TAILSCALE_STATE:-desconocido})." >&2
+if [[ "$TAILSCALE_READY" != "1" ]]; then
+    echo "Error: Tailscale no está listo: requiere Running y healthcheck healthy (estado: ${TAILSCALE_STATE:-desconocido})." >&2
     echo "Revisá: docker compose --file $COMPOSE_FILE logs tailscale" >&2
     exit 1
 fi

@@ -9,6 +9,11 @@ El Compose define dos servicios:
 - `clis-code`: contiene las CLIs, OpenSSH, Mosh, Moshi Hook, Herdr, Docker CLI y
   los navegadores.
 
+El sidecar usa `tailscale-entrypoint.sh` sobre la imagen oficial. Mantiene el
+daemon activo durante device approval, comprueba el estado cada 10 segundos y
+solo usa la auth key en `NeedsLogin`. El healthcheck exige `Running` y `clis`
+espera la aprobacion antes de iniciar el servicio persistente.
+
 `clis-code` usa `network_mode: service:tailscale`. Ambos servicios comparten el
 mismo namespace de red, por lo que SSH, Mosh y cualquier servidor iniciado en
 `clis-code` quedan disponibles en la IP Tailscale sin publicar puertos Docker.

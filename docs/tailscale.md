@@ -12,8 +12,9 @@ docker compose up -d tailscale
 docker compose ps
 ```
 
-El sidecar usa `TS_AUTH_ONCE=true`. Tras el primer registro, la identidad queda
-en el volumen `tailscale-state` y los reinicios no consumen otra key.
+El sidecar conserva la identidad en el volumen `tailscale-state`. Solo usa la
+auth key cuando el daemon informa `NeedsLogin`; los reinicios de un nodo ya
+registrado no consumen otra key.
 
 ## Aprobar el dispositivo
 
@@ -24,9 +25,27 @@ Si el tailnet tiene device approval, el nodo queda en
 
 Mientras esta pendiente:
 
-- `clis` termina con un mensaje de aprobacion.
-- El contenedor oficial puede reiniciarse al vencer su intento inicial.
+- El sidecar mantiene `tailscaled` activo y comprueba su estado cada 10 segundos,
+  sin limite de espera ni reinicios por aprobacion pendiente. El daemon recibe
+  la aprobacion y restablece la conexion automaticamente.
+- `clis` muestra el enlace de aprobacion, comprueba cada 10 segundos y continua
+  cuando llega a `Running` y el healthcheck marca `healthy`. Ctrl+C cancela
+  la espera y deja el sidecar activo.
+- Si falta login o el nodo esta detenido, el sidecar intenta `tailscale up`
+  con un timeout de 5 segundos por intento y pausa de 10 segundos entre intentos.
+- El healthcheck sigue exigiendo `Running`: mientras espera puede aparecer
+  `unhealthy`, pero Docker Compose no lo reinicia por ese motivo.
 - Tener una IP asignada no significa que el nodo ya pueda intercambiar trafico.
+
+Si `docker compose up -d` termina por dependencia no saludable durante una
+espera larga, el sidecar sigue activo. Tras aprobarlo, repite el comando para
+iniciar `clis-code`, o usa `clis up -d` para esperar y continuar automaticamente.
+
+El arranque se define en `tailscale-entrypoint.sh`, montado en solo lectura
+sobre la imagen oficial. Usa `/bin/sh` porque esa imagen Alpine no incluye
+Bash. Evita el timeout inicial de `containerboot` sin cambiar la imagen ni los
+volumenes de identidad. Si el daemon muere, se conserva la politica
+`restart: unless-stopped`; al detener el contenedor se termina tambien el daemon.
 
 ## Verificar el estado
 
@@ -91,11 +110,10 @@ docker compose ps
 Un `restart` no actualiza el env del contenedor. Cierra y vuelve a abrir las
 sesiones efimeras, que pueden conservar el namespace anterior.
 
-Compose pasa los tres flags explicitos mediante `TS_EXTRA_ARGS` para el primer
-`tailscale up`. Con identidad persistida, `TS_AUTH_ONCE=true` evita otro login,
-pero el `tailscale set` de containerboot no reaplica esos argumentos extra.
-Por eso el healthcheck ejecuta `tailscale set` con los tres valores antes de
-validar `Running`, y los vuelve a reconciliar cada 10 segundos. Al volver al
+El entrypoint pasa los tres flags explicitos al ejecutar `tailscale up`.
+Con identidad persistida no repite el login. El healthcheck ejecuta
+`tailscale set` con los tres valores, DNS y hostname antes de validar `Running`,
+y los vuelve a reconciliar cada 10 segundos. Al volver al
 modo normal, `--advertise-exit-node=false`, `--exit-node=` y
 `--exit-node-allow-lan-access=false` limpian las preferencias anteriores sin
 borrar identidad. Los cambios manuales a esos flags se sobrescriben.
@@ -133,11 +151,11 @@ No borres volumenes ni generes otra auth key para corregir este estado.
 Referencias oficiales:
 
 - [Variables Docker](https://tailscale.com/docs/features/containers/docker/docker-params):
-  `TS_EXTRA_ARGS`, `TS_AUTH_ONCE`, `TS_USERSPACE` y estado persistente.
+  estado persistente y opciones de la imagen oficial.
 - [Exit nodes](https://tailscale.com/kb/1103/exit-nodes): forwarding, aprobacion
   manual, seleccion por cliente y acceso LAN.
 - [Containerboot](https://github.com/tailscale/tailscale/blob/main/cmd/containerboot/tailscaled.go):
-  diferencia entre `tailscaleUp` y `tailscaleSet` con `TS_AUTH_ONCE`.
+  arranque oficial que se reemplaza para esperar aprobacion sin timeout.
 
 ## MagicDNS
 
@@ -166,8 +184,8 @@ No se publica el puerto en Internet ni en todas las interfaces del host.
 
 ## Rotar o recrear la identidad
 
-Rotar la auth key de `.env` no cambia una identidad ya registrada por
-`TS_AUTH_ONCE=true`. Para una identidad nueva hay que eliminar deliberadamente
+Rotar la auth key de `.env` no cambia una identidad ya registrada.
+Para una identidad nueva hay que eliminar deliberadamente
 el volumen de estado y volver a registrar el nodo. Esa operacion es destructiva
 y tambien requiere eliminar o deshabilitar el nodo anterior en Tailscale Admin.
 

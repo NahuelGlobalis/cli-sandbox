@@ -3,20 +3,20 @@ services:
     image: tailscale/tailscale:stable
     container_name: clis-tailscale
     hostname: ${TAILSCALE_HOSTNAME:-clis-code}
+    # Supervisar tailscaled sin vencer mientras espera device approval.
+    entrypoint: ["/bin/sh", "/usr/local/bin/clis-tailscale-entrypoint"]
+    init: true
     environment:
       TS_AUTHKEY: ${TS_AUTHKEY:?Define TS_AUTHKEY en .env}
-      TS_AUTH_ONCE: "true"
       TS_STATE_DIR: /var/lib/tailscale
       TS_SOCKET: /var/run/tailscale/tailscaled.sock
-      TS_USERSPACE: "false"
       TS_ACCEPT_DNS: "true"
       TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-clis-code}
-      # Flags explicitos tambien para limpiar preferencias del modo anterior.
-      TS_EXTRA_ARGS: --advertise-exit-node=${TAILSCALE_ADVERTISE_EXIT_NODE:-false} --exit-node=${TAILSCALE_EXIT_NODE:-} --exit-node-allow-lan-access=${TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS:-false}
       CLIS_TS_ADVERTISE_EXIT_NODE: ${TAILSCALE_ADVERTISE_EXIT_NODE:-false}
       CLIS_TS_EXIT_NODE: ${TAILSCALE_EXIT_NODE:-}
       CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS: ${TAILSCALE_EXIT_NODE_ALLOW_LAN_ACCESS:-false}
     volumes:
+      - ./tailscale-entrypoint.sh:/usr/local/bin/clis-tailscale-entrypoint:ro
       - tailscale-state:/var/lib/tailscale
       - tailscale-socket:/var/run/tailscale
     cap_add:
@@ -29,7 +29,6 @@ services:
       net.ipv4.ip_forward: "1"
       net.ipv6.conf.all.forwarding: "1"
     healthcheck:
-      # containerboot no reaplica TS_EXTRA_ARGS con TS_AUTH_ONCE=true.
       # Reconciliar antes de marcar healthy; rechazar modos simultaneos.
       test:
         - CMD-SHELL
@@ -37,6 +36,8 @@ services:
           test "$${CLIS_TS_ADVERTISE_EXIT_NODE}" = false || test -z "$${CLIS_TS_EXIT_NODE}" || exit 1;
           test -n "$${CLIS_TS_EXIT_NODE}" || test "$${CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS}" = false || exit 1;
           tailscale set
+          --accept-dns="$${TS_ACCEPT_DNS}"
+          --hostname="$${TS_HOSTNAME}"
           --advertise-exit-node="$${CLIS_TS_ADVERTISE_EXIT_NODE}"
           --exit-node="$${CLIS_TS_EXIT_NODE}"
           --exit-node-allow-lan-access="$${CLIS_TS_EXIT_NODE_ALLOW_LAN_ACCESS}"

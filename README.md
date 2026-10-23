@@ -223,7 +223,8 @@ docker compose ps
 Si el tailnet tiene habilitada la aprobación de dispositivos, entra a
 [Tailscale Admin > Machines](https://login.tailscale.com/admin/machines) y
 aprobá el nodo `clis-code`. Hasta entonces aparecerá como pendiente, el estado
-será `NeedsMachineAuth` y `clis` indicará que falta esa aprobación.
+será `NeedsMachineAuth`. El sidecar permanece activo y `clis` espera, comprueba
+cada 10 segundos y continúa automáticamente cuando lo aprobás.
 
 El estado del nodo y su nombre MagicDNS se pueden comprobar así:
 
@@ -232,8 +233,8 @@ docker compose exec -u dev clis-code tailscale status
 docker compose exec -u dev clis-code tailscale ip -4
 ```
 
-La identidad de Tailscale queda en un volume y `TS_AUTH_ONCE=true` evita
-reautenticar el nodo en cada reinicio. El archivo `.env` contiene un secreto y
+La identidad de Tailscale queda en un volume y el entrypoint solo usa la auth
+key en `NeedsLogin`. El archivo `.env` contiene un secreto y
 está ignorado por Git.
 
 ### 2. Emparejar Moshi
