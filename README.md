@@ -11,6 +11,7 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 - **Herdr** (`herdr`) – multiplexor de terminal para agentes
 - **Moshi Hook** (`moshi-hook`) – Easy Pair, notificaciones y vistas de agentes
 - **OpenSSH + Mosh + tmux** – acceso remoto y sesiones persistentes
+- **Neovim + LazyVim tooling** (`nvim`, `rg`, `fd`, `tree-sitter`, `lazygit`) – editor tipo IDE; la config de LazyVim vive en el home persistente
 - **Tailscale CLI** – usa el daemon del sidecar para descubrir MagicDNS
 - **pnpm** – gestor de paquetes Node.js
 - **uv** – gestor de Python y entornos
@@ -117,6 +118,7 @@ comparten inmediatamente entre ambos.
 | pnpm global | `/opt/pnpm-global/` | OpenCode, Playwright |
 | Playwright browsers | `/opt/playwright-browsers/` | Chromium |
 | Python (uv) | `/opt/uv/python/` | Interprete fuera del volume |
+| Neovim | `/opt/nvim-linux-x86_64/` | Binario fuera del volume; config en el home |
 
 > **Seguridad:** `~/.clis-code/home` contiene tokens de acceso. No lo subas a Git ni lo compartas. Git y SSH se montan en modo lectura desde el host; el home del contenedor permanece escribible para persistir autenticación y estado.
 

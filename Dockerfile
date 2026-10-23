@@ -14,6 +14,9 @@ ARG UV_VERSION=0.11.24
 ARG PYTHON_VERSION=3.12
 ARG OPENCODE_VERSION=latest
 ARG CODEX_VERSION=latest
+ARG NVIM_VERSION=0.12.6
+ARG TREE_SITTER_VERSION=0.27.1
+ARG LAZYGIT_VERSION=0.66.2
 
 # Las CLIs propietarias y Google Chrome se distribuyen para amd64.
 RUN test "${TARGETARCH}" = "amd64" \
@@ -47,7 +50,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         curl wget ca-certificates git gnupg unzip xz-utils openssh-client openssh-server \
         build-essential libssl-dev pkg-config \
-        vim nano htop procps tree gosu rsync mosh tmux cron \
+        vim nano htop procps tree gosu rsync mosh tmux cron ripgrep fd-find \
         fonts-liberation fonts-noto-color-emoji xdg-utils \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/ssh/ssh_host_* \
@@ -67,6 +70,16 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && apt-get update \
     && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
+
+# --- 1c. Neovim y herramientas de LazyVim ---
+# El Neovim de Ubuntu 24.04 es demasiado antiguo para LazyVim (>= 0.11.2).
+RUN curl -fsSL --retry 3 "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-x86_64.tar.gz" | tar -xz -C /opt \
+    && ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim \
+    && curl -fsSL --retry 3 "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/tree-sitter-linux-x64.gz" | gunzip > /usr/local/bin/tree-sitter \
+    && chmod 0755 /usr/local/bin/tree-sitter \
+    && curl -fsSL --retry 3 "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_linux_x86_64.tar.gz" | tar -xz -C /usr/local/bin lazygit \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && nvim --version && tree-sitter --version && lazygit --version && rg --version && fd --version
 
 # --- 2. Node.js y pnpm ---
 RUN export HOME=/root \
@@ -274,6 +287,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     && command -v moshi-hook \
     && command -v mosh-server \
     && command -v tmux \
+    && command -v nvim \
     && command -v sshd \
     && command -v tailscale \
     && command -v uv \
