@@ -23,7 +23,7 @@ RUN test "${TARGETARCH}" = "amd64" \
     || (echo "Esta imagen solo admite linux/amd64" >&2 && exit 1)
 
 LABEL org.opencontainers.image.title="clis-code" \
-      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Antigravity, OpenCode, Codex, Herdr) + Chrome/Playwright + Docker CLI" \
+      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Antigravity, OpenCode, Codex, Orca) + Chrome/Playwright + Docker CLI" \
       org.opencontainers.image.source="https://github.com/nahue/clis-code" \
       org.opencontainers.image.authors="nahue" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
@@ -36,10 +36,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HOME=/home/dev \
     SHELL=/bin/bash \
     XDG_DATA_HOME=/home/dev/.local/share \
-    HERDR_CONFIG_PATH=/home/dev/.config/herdr/config.toml \
     UV_PYTHON_INSTALL_DIR=/opt/uv/python \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers \
-    PATH="/opt/herdr/bin:/home/dev/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    PATH="/home/dev/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
     PNPM_HOME=/opt/pnpm-global
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -120,9 +119,9 @@ RUN userdel -r ubuntu 2>/dev/null || true \
     && useradd --create-home --shell /bin/bash --uid 1000 dev \
     && passwd -d dev \
     && mkdir -p /home/dev/.local/bin /home/dev/projects \
-        /home/dev/.cache /home/dev/.config/herdr /home/dev/.local/state /home/dev/.local/share \
-        /opt/pnpm-global/bin /opt/antigravity/bin /opt/herdr/bin /opt/playwright-browsers \
-    && chown -R dev:dev /home/dev /opt/pnpm-global /opt/antigravity /opt/herdr /opt/playwright-browsers /opt/uv
+        /home/dev/.cache /home/dev/.config/orca /home/dev/.local/state /home/dev/.local/share \
+        /opt/pnpm-global/bin /opt/antigravity/bin /opt/playwright-browsers \
+    && chown -R dev:dev /home/dev /opt/pnpm-global /opt/antigravity /opt/playwright-browsers /opt/uv
 
 # --- 6. Instalación de las CLIs como dev ---
 USER dev
@@ -185,18 +184,29 @@ ADD --chown=dev:dev https://registry.npmjs.org/@openai%2Fcodex/latest /tmp/codex
 RUN pnpm add -g "@openai/codex@${CODEX_VERSION}" \
     && rm -f /tmp/codex-latest.json
 
-# Herdr: el binario vive en /opt para que el volume persistente del home no lo oculte.
-# La configuración queda en /home/dev/.config/herdr y se conserva con el resto del home.
-# El manifest remoto invalida la caché de esta capa cuando aparece una versión estable.
-ADD --chown=dev:dev https://herdr.dev/latest.json /tmp/herdr-latest.json
-RUN HERDR_URL="$(awk -F '"' \
-        '/^[[:space:]]*"linux-x86_64"[[:space:]]*:/ { print $4; exit }' \
-        /tmp/herdr-latest.json)" \
-    && test -n "${HERDR_URL}" \
-    && curl -fsSL --retry 3 "${HERDR_URL}" -o /opt/herdr/bin/herdr \
-    && chmod +x /opt/herdr/bin/herdr \
-    && herdr --version \
-    && rm -f /tmp/herdr-latest.json
+# Orca: servidor remoto headless y CLI. El .deb instala /opt/Orca y
+# /usr/bin/orca-ide. El ADD remoto invalida la cache cuando cambia la pagina
+# de la ultima release estable; el .deb no se actualiza solo.
+USER root
+ADD https://github.com/stablyai/orca/releases/latest /tmp/orca-latest.html
+RUN ORCA_VERSION="$(grep -oE '/stablyai/orca/releases/tag/v[0-9]+\.[0-9]+\.[0-9]+' \
+        /tmp/orca-latest.html | head -n1 | sed 's#.*/v##')" \
+    && test -n "${ORCA_VERSION}" \
+    && curl -fsSL --retry 3 \
+        "https://github.com/stablyai/orca/releases/download/v${ORCA_VERSION}/orca-ide_${ORCA_VERSION}_amd64.deb" \
+        -o /tmp/orca-ide.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        xvfb zlib1g-dev \
+        libgtk-3-0t64 libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+        libgbm1 libasound2t64 libxtst6 libcups2t64 libdrm2 libxkbcommon0 \
+        libpango-1.0-0 libcairo2 libatspi2.0-0t64 libxcomposite1 \
+        libxdamage1 libxfixes3 libxrandr2 libxrender1 libx11-xcb1 \
+        libxcb-dri3-0 libxss1 \
+        /tmp/orca-ide.deb \
+    && orca-ide --version \
+    && rm -f /tmp/orca-ide.deb /tmp/orca-latest.html \
+    && rm -rf /var/lib/apt/lists/*
 
 # Moshi Hook: Easy Pair para SSH/Mosh, sesiones tmux y eventos de los agentes.
 # El manifest remoto invalida la caché cuando se publica una versión nueva.
@@ -214,34 +224,8 @@ RUN MOSHI_HOOK_VERSION="$(tr -d '[:space:]' </tmp/moshi-hook-latest.txt)" \
 
 USER dev
 
-# Atajo del sidebar compartido: el build lo usa para la config inicial y el
-# entrypoint lo agrega a homes persistentes creados antes de esta imagen.
-COPY --chown=dev:dev herdr-keys.toml /usr/local/share/clis-code/herdr-keys.toml
-
-RUN herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --yes \
-    && mkdir -p /home/dev/.local/state/herdr/plugins/herdr-sidebar \
-    && printf '%s\n' \
-        '{"merged":true,"active":"explorer","hotkeys":false,"font_prompt":true,"auto_open":false,"strict_toggle":false,"focus_on_open":true,"follow_cwd":true,"git_deco":true,"dock_right":false,"sidebar_width":32,"colors":"vscode","preview_placement":"tab"}' \
-        > /home/dev/.local/state/herdr/plugins/herdr-sidebar/state.json \
-    && printf '%s\n' \
-        '[ui.toast]' \
-        'delivery = "system"' \
-        '' \
-        '[theme]' \
-        'name = "catppuccin"' \
-        'auto_switch = false' \
-        > "${HERDR_CONFIG_PATH}" \
-    && cat /usr/local/share/clis-code/herdr-keys.toml >> "${HERDR_CONFIG_PATH}"
-
-# Registrar las CLIs del Dockerfile como integraciones de Herdr.
-# Las integraciones opcionales agregan estado y restauración de sesiones
-# cuando el agente lo admite. Se instalan tras el binario de Herdr. Herdr
-# exige que el directorio de config de cada CLI ya exista (normalmente lo crea
-# la CLI en su primer uso), así que se precrean aquí.
-RUN mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config \
-    && for cli in devin antigravity-cli opencode codex; do \
-        herdr integration install "$cli" || echo "WARN: integration '$cli' no disponible"; \
-    done
+# Precrear los directorios de config que usan las CLIs y sus hooks.
+RUN mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config
 
 # Hooks de Moshi para los eventos de los agentes (inicio/fin, notificaciones).
 # No requieren pairing durante la build; el token se agrega después con
@@ -268,10 +252,7 @@ RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /tmp/google-
 # pueda sincronizarla cuando el volume del home está vacío (primer arranque).
 RUN cp -a /home/dev /home/dev-skel \
     && rm -rf /home/dev-skel/.cache /home/dev-skel/.local/state \
-    && mkdir -p /home/dev-skel/.cache \
-        /home/dev-skel/.local/state/herdr/plugins/herdr-sidebar \
-    && cp /home/dev/.local/state/herdr/plugins/herdr-sidebar/state.json \
-        /home/dev-skel/.local/state/herdr/plugins/herdr-sidebar/state.json \
+    && mkdir -p /home/dev-skel/.cache /home/dev-skel/.local/state \
     && chown -R dev:dev /home/dev-skel
 
 USER dev
@@ -283,7 +264,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     && command -v agy \
     && command -v opencode \
     && command -v codex \
-    && command -v herdr \
+    && command -v orca-ide \
     && command -v moshi-hook \
     && command -v mosh-server \
     && command -v tmux \

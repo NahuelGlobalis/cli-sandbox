@@ -52,6 +52,9 @@ services:
     # exponerlo a la LAN: solo el host puede alcanzarlo.
     ports:
       - "127.0.0.1:24544:24544"
+      # Orca web UI + pairing; mismo razonamiento que Moshi. 6769 para
+      # no chocar con un Orca nativo del host que ya use 6768.
+      - "127.0.0.1:6769:${ORCA_PORT:-6768}"
     restart: unless-stopped
 
   clis-code:
@@ -89,6 +92,17 @@ services:
       # (lo que ocultaría el authorized_keys persistente de Easy Pair/Moshi).
       - SSH_AUTH_SOCK=/tmp/clis-ssh-agent.sock
       - MOSHI_HOOK_AUTOSTART=1
+      # Orca Remote Server. Usa el nombre MagicDNS para el enlace de pairing;
+      # el puerto se alcanza por el tailnet sin publicarlo en Docker.
+      - TAILSCALE_HOSTNAME=${TAILSCALE_HOSTNAME:-clis-code}
+      - ORCA_SERVE_AUTOSTART=${ORCA_SERVE_AUTOSTART:-1}
+      - ORCA_PORT=${ORCA_PORT:-6768}
+      - ORCA_PAIRING_ADDRESS=${ORCA_PAIRING_ADDRESS:-}
+      - ORCA_MOBILE_PAIRING=${ORCA_MOBILE_PAIRING:-0}
+      # Ruta absoluta de la raíz en el host Docker; los agentes la usan para
+      # bind mounts `docker run -v <ruta-host>/...`, que el daemon resuelve
+      # en el filesystem del host, no en el del contenedor.
+      - CLIS_PROJECTS_ROOT=${CLIS_PROJECTS_ROOT:-/mnt/c/dev}
       # Git: identidad (sobreescribe .gitconfig del host sin modificarlo)
       - GIT_AUTHOR_NAME=nahuel.cano
       - GIT_AUTHOR_EMAIL=nahuelcano@gmail.com
@@ -114,6 +128,10 @@ services:
       - ${HOME}/.git-credentials:/home/dev/.git-credentials:ro
       # Todos los repos comparten la misma ruta en sesiones locales y remotas.
       - ${CLIS_PROJECTS_ROOT:-/mnt/c/dev}:/home/dev/projects
+      # Alias en la misma ruta absoluta del host: los `docker run -v` emitidos
+      # dentro del contenedor con paths del host (p. ej. bajo $PWD real) se
+      # resuelven correctamente en el daemon.
+      - ${CLIS_PROJECTS_ROOT:-/mnt/c/dev}:${CLIS_PROJECTS_ROOT:-/mnt/c/dev}
       # Crontab del repo (formato de crontab de usuario). El entrypoint lo carga
       # con `crontab` al arrancar; los agentes editan este archivo (writable)
       # y recargan con `crontab /etc/clis-code/crontab`. Solo corre en el

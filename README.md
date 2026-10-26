@@ -1,4 +1,4 @@
-# Docker image para CLIs de codificación (Devin + Antigravity + OpenCode + Codex + Herdr) + Chrome/Playwright
+# Docker image para CLIs de codificación (Devin + Antigravity + OpenCode + Codex + Orca) + Chrome/Playwright
 
 Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más populares, listo para usar sin riesgos en el sistema host. También incluye Google Chrome y Chromium para Playwright.
 
@@ -8,7 +8,7 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 - **Antigravity CLI** (`agy`) – Google
 - **OpenCode CLI** (`opencode`) – Anomaly
 - **Codex CLI** (`codex`) – OpenAI
-- **Herdr** (`herdr`) – multiplexor de terminal para agentes
+- **Orca** (`orca-ide`) – servidor remoto y cliente para sesiones de agentes
 - **Moshi Hook** (`moshi-hook`) – Easy Pair, notificaciones y vistas de agentes
 - **OpenSSH + Mosh + tmux** – acceso remoto y sesiones persistentes
 - **Neovim + LazyVim tooling** (`nvim`, `rg`, `fd`, `tree-sitter`, `lazygit`) – editor tipo IDE; la config de LazyVim vive en el home persistente
@@ -35,7 +35,7 @@ Las guías detalladas están organizadas por tema en [`docs/`](docs/README.md):
 - [Instalación en WSL](docs/setup-wsl.md)
 - [Tailscale y MagicDNS](docs/tailscale.md)
 - [Moshi, Easy Pair y hooks](docs/moshi.md)
-- [Codex, OpenCode y sesiones Herdr](docs/agents-and-herdr.md)
+- [Codex, OpenCode y servidor Orca](docs/agents-and-orca.md)
 - [Troubleshooting](docs/troubleshooting.md)
 
 ## Construir la imagen
@@ -44,11 +44,12 @@ Las guías detalladas están organizadas por tema en [`docs/`](docs/README.md):
 docker build -t clis-code:latest .
 ```
 
-Durante cada build, Devin, Antigravity, OpenCode, Codex y Herdr resuelven su
-última versión estable. Sus manifests o metadatos remotos forman parte de la
-clave de caché de Docker, por lo que una nueva release invalida automáticamente
-la capa de instalación correspondiente. Las CLIs se actualizan al reconstruir
-la imagen, no al ejecutar el contenedor.
+Durante cada build, Devin, Antigravity, OpenCode, Codex y Orca resuelven su
+última versión estable. Sus manifests, páginas de release o metadatos remotos
+forman parte de la clave de caché de Docker, por lo que una nueva release
+invalida automáticamente la capa de instalación correspondiente. Las CLIs se
+actualizan al reconstruir la imagen, no al ejecutar el contenedor. El `.deb` de
+Orca no se autoactualiza.
 
 ## Ejecutar el contenedor
 
@@ -95,7 +96,7 @@ La imagen monta un volume principal en `/home/dev` que persiste todo el home del
 
 ```
 ~/.clis-code/home/          # → /home/dev (volume principal)
-├── .config/                # configs de Devin, OpenCode, Herdr, etc.
+├── .config/                # configs de Devin, OpenCode, Orca, etc.
 ├── .local/share/           # credenciales, sesiones, datos de uv
 ├── .local/state/           # estado de OpenCode
 ├── .cache/                 # cache de OpenCode, uv, etc.
@@ -114,7 +115,7 @@ comparten inmediatamente entre ambos.
 |---|---|---|
 | Devin | `/opt/devin/` | Binario separado de credenciales |
 | Antigravity | `/opt/antigravity/bin/` | Binario fuera del volume |
-| Herdr | `/opt/herdr/bin/` | Binario fuera del volume; config en el home |
+| Orca | `/opt/Orca/` y `/usr/bin/orca-ide` | App y CLI fuera del volume; datos en el home |
 | pnpm global | `/opt/pnpm-global/` | OpenCode, Playwright |
 | Playwright browsers | `/opt/playwright-browsers/` | Chromium |
 | Python (uv) | `/opt/uv/python/` | Interprete fuera del volume |
@@ -167,33 +168,27 @@ Tailscale del nodo) sin publicar puertos Docker. El servidor imprime una
 contraseña al arrancar; también puedes fijarla con
 `OPENCODE_SERVER_PASSWORD`.
 
-## Usar Herdr
+## Usar Orca
 
-Inicia Herdr desde cualquier proyecto:
+El servicio persistente arranca `orca-ide serve` como `dev` y lo deja
+escuchando en el puerto `6768` del tailnet. Orca conserva proyectos, worktrees,
+terminales y sesiones de agentes en el home persistente; no es un multiplexor
+de terminal y no requiere Herdr.
 
-```bash
-herdr
-```
-
-Su configuración se guarda en `/home/dev/.config/herdr/config.toml` mediante
-`HERDR_CONFIG_PATH`. Como `/home/dev` está montado en
-`~/.clis-code/home`, los ajustes, plugins e integraciones sobreviven a la
-recreación del contenedor.
-
-Para generar una configuración completa como punto de partida:
+El pairing URL se imprime en el log:
 
 ```bash
-herdr --default-config > "${HERDR_CONFIG_PATH}"
+clis pairing
 ```
 
-Herdr detecta los agentes instalados. Las integraciones opcionales agregan
-estado y restauración de sesiones cuando el agente lo admite:
+Pegalo en **Settings → Remote Orca Servers → Add Server** del cliente Orca. El
+enlace es un secreto. Para mobile, definí `ORCA_MOBILE_PAIRING=1` en `.env` y
+recreá el servicio para obtener el QR correspondiente.
 
-```bash
-herdr integration install codex
-herdr integration install devin
-herdr integration install opencode
-```
+El primer arranque descarga el runtime de Orca (unos 150 MB) y puede tardar. Los
+ajustes del servidor, las credenciales y las sesiones sobreviven a la
+recreación del contenedor porque viven en `~/.clis-code/home`. La guía completa
+está en [Agentes y Orca](docs/agents-and-orca.md).
 
 ## Acceso desde el celular con Tailscale + Moshi
 
@@ -255,14 +250,11 @@ pública a `/home/dev/.ssh/authorized_keys` dentro del home persistente.
 Usá **Auto** como tipo de conexión. No habilites Tailscale SSH: Moshi necesita
 OpenSSH normal sobre Tailscale para Easy Pair y para iniciar Mosh.
 
-### 3. Abrir Herdr y activar eventos de agentes
+### 3. Conectar Orca y activar eventos de agentes
 
-Una vez conectado desde Moshi:
-
-```bash
-cd ~/projects
-herdr
-```
+Una vez conectado el servidor Orca desde el cliente de escritorio, abrí un
+proyecto en `/home/dev/projects`. Los terminales y agentes se ejecutan dentro de
+`clis-code`.
 
 Para recibir aprobaciones, finalizaciones y vistas de Codex/OpenCode en Moshi,
 copiá el token de `Moshi > Settings > Hooks` y corré dentro de la conexión:
@@ -397,7 +389,7 @@ clis devin
 clis agy
 clis opencode
 clis codex
-clis herdr
+clis orca-ide --version
 
 # Ejecutar cualquier comando dentro del contenedor
 clis pnpm install
@@ -433,10 +425,14 @@ La configuración `init: true` del servicio maneja correctamente señales y
 procesos zombie. Las sesiones efímeras no arrancan otro SSH ni otro Moshi Hook,
 evitando conflictos de puertos con el servicio persistente.
 
-El script conserva la ruta relativa desde `CLIS_PROJECTS_ROOT`: si se invoca en
-`/mnt/c/dev/repos/mi-proyecto/src`, abre
-`/home/dev/projects/repos/mi-proyecto/src`. La raíz completa queda visible tanto
-en sesiones `clis` como desde Moshi. El home persiste en
+El script abre la sesión en la ruta absoluta del host: si se invoca en
+`/mnt/c/dev/repos/mi-proyecto/src`, el contenedor arranca en esa misma ruta.
+Así, los `docker run -v` que lanzan los agentes con paths del host los resuelve
+el daemon correctamente. La raíz completa también queda visible en
+`/home/dev/projects` (mismo árbol, pero esa ruta no sirve para bind mounts
+internos) tanto en sesiones `clis` como desde Moshi; `$CLIS_PROJECTS_ROOT`
+queda exportada en el contenedor. Fuera de la raíz, solo el directorio actual
+se monta en la misma ruta absoluta. El home persiste en
 `~/.clis-code/home` y las skills se comparten desde `~/.agents/skills`.
 
 No se publican puertos con `-p` porque el contenedor comparte el namespace de
@@ -519,12 +515,12 @@ Asegúrate de que Docker Desktop tenga habilitado el recurso compartido (`Settin
 
 ### `devin`, `agy` o `opencode` no se encuentran
 
-El `PATH` remoto incluye `/home/dev/.local/bin`, `/opt/pnpm-global/bin` y
-`/opt/herdr/bin`. Si la sesión se abrió antes de actualizar la imagen,
-reconectala o ajusta temporalmente el PATH:
+El `PATH` remoto incluye `/home/dev/.local/bin`, `/opt/pnpm-global/bin`,
+`/opt/antigravity/bin` y `/opt/devin`. Si la sesión se abrió antes de actualizar
+la imagen, reconectala o ajusta temporalmente el PATH:
 
 ```bash
-export PATH="/opt/herdr/bin:$HOME/.local/bin:/opt/pnpm-global/bin:$PATH"
+export PATH="$HOME/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
 ```
 
 ### Playwright no encuentra el navegador
@@ -551,7 +547,7 @@ uv run python script.py
 - `docker-compose.yml` – orquestación de ejemplo
 - `clis` – script de acceso rápido para lanzar el contenedor
 - `README.md` – este documento
-- `docs/` – guías de arquitectura, WSL, Tailscale, Moshi, Herdr y diagnóstico
+- `docs/` – guías de arquitectura, WSL, Tailscale, Moshi, Orca y diagnóstico
 - `LICENSE` – licencia MIT
 - `.github/workflows/docker-build.yml` – CI: build en push/PR
 - `.github/workflows/docker-publish.yml` – CD: publish a GHCR en tags

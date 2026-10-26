@@ -6,8 +6,8 @@ El Compose define dos servicios:
 
 - `clis-tailscale`: ejecuta `tailscaled`, conserva la identidad del nodo y
   expone su socket Unix.
-- `clis-code`: contiene las CLIs, OpenSSH, Mosh, Moshi Hook, Herdr, Docker CLI y
-  los navegadores.
+- `clis-code`: contiene las CLIs, OpenSSH, Mosh, Moshi Hook, el servidor Orca,
+  Docker CLI y los navegadores.
 
 El sidecar usa `tailscale-entrypoint.sh` sobre la imagen oficial. Mantiene el
 daemon activo durante device approval, comprueba el estado cada 10 segundos y
@@ -29,6 +29,9 @@ host no esta en el tailnet, el puerto se publica desde el servicio `tailscale`
 vinculado a `127.0.0.1` (`127.0.0.1:24544:24544`). Asi el browser del host lo
 alcanza en `http://localhost:24544` sin exponerlo a la LAN. Ver
 [Moshi](moshi.md#moshi-desktop-en-el-host).
+Con el mismo criterio se publica la web UI de Orca en
+`127.0.0.1:6769:6768` (6769 para no chocar con un Orca nativo del host en
+6768): el browser local la abre en `http://localhost:6769`.
 
 ```text
 Telefono                       WSL / Docker
@@ -47,6 +50,7 @@ Tailscale + Moshi
 - OpenSSH en el puerto 22 del tailnet.
 - Mosh en su rango UDP normal.
 - `moshi-hook serve` y su WebSocket hacia Moshi.
+- `orca-ide serve` en el puerto 6768 del tailnet.
 - `cron` con el crontab del usuario dev (sembrado desde `./crontab`).
 - Home y claves de host persistentes.
 
@@ -63,7 +67,8 @@ El script `clis` levanta los servicios con Compose y crea la sesion efimera con
 `--volumes-from` y se adjunta al namespace de `clis-tailscale`. Ademas:
 
 - Monta la raiz compartida `CLIS_PROJECTS_ROOT` (`/mnt/c/dev` por defecto).
-- Conserva el subdirectorio actual como working directory.
+- Abre la sesion en la ruta absoluta del host del directorio actual; la raiz
+  tambien queda montada en `/home/dev/projects`.
 - Comparte red, home, credenciales, skills y Docker socket con Compose.
 - Inicia primero el sidecar y exige `BackendState=Running`.
 - Asegura que el servicio persistente `clis-code` quede levantado (con `sshd`
@@ -79,29 +84,40 @@ persistente que recibe las conexiones del telefono.
 
 | Host WSL / volumen | Contenedor | Contenido |
 | --- | --- | --- |
-| `~/.clis-code/home` | `/home/dev` | Credenciales, hooks y sockets |
+| `~/.clis-code/home` | `/home/dev` | Credenciales, hooks y datos de Orca |
 | `/mnt/c/dev` | `/home/dev/projects` | Todos los repos de trabajo |
+| `/mnt/c/dev` | `/mnt/c/dev` (misma ruta) | Alias: los `-v` internos los resuelve el daemon en el host |
 | `~/.agents/skills` | `/home/dev/.agents/skills` | Skills compartidas |
 | `~/.ssh` | `/home/dev/.git-ssh` | Claves SSH del host (solo lectura) |
 | `tailscale-state` | `/var/lib/tailscale` | Identidad del nodo |
 | `tailscale-socket` | `/var/run/tailscale` | Socket del daemon Tailscale |
 | `ssh-host-keys` | `/var/lib/ssh` | Identidad estable de OpenSSH |
-| `./crontab` | `/etc/clis-code/crontab` | Tareas programadas; el entrypoint las carga con `crontab` y los agentes las editan y recargan |
+| `./crontab` | `/etc/clis-code/crontab` | Tareas programadas de `dev` |
 
-La ruta relativa se conserva. Por ejemplo,
-`/mnt/c/dev/repos/publics/cli-sandbox` se abre como
-`/home/dev/projects/repos/publics/cli-sandbox`. El servicio persistente y las
-sesiones `clis` ven el mismo arbol completo.
+La ruta absoluta se conserva. Por ejemplo,
+`/mnt/c/dev/repos/publics/cli-sandbox` se abre como `/mnt/c/dev/repos/publics/cli-sandbox`
+tambien dentro del contenedor. Asi, un `docker run -v "$PWD/..."` emitido por un
+agente usa una ruta que el daemon del host puede resolver. El arbol completo
+sigue visible en `/home/dev/projects`, pero los paths bajo esa ruta no sirven
+para bind mounts internos: hay que usar la ruta del host (`$CLIS_PROJECTS_ROOT`
+esta exportada en el contenedor). El servicio persistente y las sesiones `clis`
+ven el mismo arbol.
 
-## Sesiones Herdr entre contenedores
+Si `clis` se invoca fuera de `CLIS_PROJECTS_ROOT`, solo el directorio actual se
+monta en la misma ruta absoluta del host. Se rechazan rutas que taparian mounts
+o el filesystem del contenedor (`/home`, `/etc`, `/var`, etc.).
 
-Herdr guarda su socket en `/home/dev/.config/herdr/herdr.sock`. Como el home se
-comparte, el servicio persistente y una sesion `clis` pueden descubrir el mismo
-servidor Herdr mientras el contenedor que lo aloja siga vivo.
+## Servidor Orca
 
-Los archivos compartidos no implican procesos compartidos. Si termina el
-contenedor que ejecuta el servidor Herdr, esa sesion deja de existir aunque el
-socket o la configuracion permanezcan en el home.
+El servicio persistente ejecuta `orca-ide serve` como `dev` y escucha en
+`0.0.0.0:6768` dentro de la red compartida con Tailscale. Los clientes Orca se
+conectan por MagicDNS (`clis-code:6768`) y el pairing URL queda en
+`/home/dev/.local/state/orca/serve.log`.
+
+Orca conserva proyectos, worktrees, terminales y sesiones de agentes en el home
+persistente. Las sesiones efimeras de `clis` no arrancan otro servidor Orca;
+comparten el home y el runtime con el servicio persistente. Si termina el
+contenedor persistente, tambien terminan sus procesos y clientes conectados.
 
 ## PATH remoto
 
@@ -109,7 +125,6 @@ OpenSSH y Mosh no heredan automaticamente el `ENV PATH` de la imagen. La
 configuracion `sshd_config.d/99-clis-code.conf` define el PATH remoto para
 incluir:
 
-- `/opt/herdr/bin`
 - `/opt/pnpm-global/bin`
 - `/opt/antigravity/bin`
 - `/opt/devin`

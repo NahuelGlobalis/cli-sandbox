@@ -93,7 +93,7 @@ cd /mnt/c/dev/repos/mi-proyecto
 clis
 clis codex
 clis opencode
-clis herdr
+clis orca-ide --version
 clis --env API_KEY=valor comando
 
 clis down
@@ -123,14 +123,14 @@ clis up -d
 No montes `~/.ssh` sobre `/home/dev/.ssh`: ocultaria el `authorized_keys` que
 Easy Pair mantiene para Moshi.
 
-`clis` monta la raiz de proyectos y mantiene el subdirectorio desde el que se
-invoco dentro del volumen compartido. La raiz completa `/mnt/c/dev` se monta
-en `/home/dev/projects`; por ejemplo, `/mnt/c/dev/repos/mi-proyecto` se
-convierte en `/home/dev/projects/repos/mi-proyecto`.
+`clis` abre la sesion en la misma ruta absoluta del host: si se invoca en
+`/mnt/c/dev/repos/mi-proyecto`, dentro del contenedor el cwd es ese mismo
+path. La raiz completa `CLIS_PROJECTS_ROOT` se monta en su propia ruta y en
+`/home/dev/projects`; fuera de la raiz, solo el directorio actual se monta en
+la misma ruta absoluta.
 
-Los comandos que abren una sesion deben ejecutarse bajo `CLIS_PROJECTS_ROOT`.
-Para usar otra raiz, define la misma variable en `.env` y en el shell que
-ejecuta `clis`.
+Para usar otra raiz de proyectos, define `CLIS_PROJECTS_ROOT` en `.env` y en
+el shell que ejecuta `clis`.
 
 ## Entrar al servicio persistente
 
@@ -151,9 +151,10 @@ docker compose build clis-code
 docker compose up -d --force-recreate clis-code
 ```
 
-El home, Tailscale y las claves SSH sobreviven a la recreacion. Si Herdr cambia
-de version, revisa sus integraciones con:
+El home, Tailscale y las claves SSH sobreviven a la recreacion. Orca se
+actualiza al reconstruir la imagen; comprueba la version y el estado con:
 
 ```bash
-docker compose exec -u dev clis-code herdr integration status --outdated-only
+docker compose exec -u dev clis-code orca-ide --version
+docker compose exec -u dev clis-code orca-ide status --json
 ```

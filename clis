@@ -4,7 +4,6 @@ set -euo pipefail
 IMAGE="clis-code:latest"
 HOST_SKILLS_DIR="$HOME/.agents/skills"
 HOST_HOME_DIR="$HOME/.clis-code/home"
-CONTAINER_PROJECTS_DIR="/home/dev/projects"
 
 mkdir -p "$HOST_SKILLS_DIR" "$HOST_HOME_DIR"
 
@@ -119,6 +118,18 @@ case "${1:-}" in
         fi
         exit 0
         ;;
+    pairing)
+        [[ $# -eq 1 ]] || { echo "Error: clis pairing no acepta argumentos." >&2; exit 2; }
+        # La tuberia corre dentro del contenedor: en el host, pipefail + SIGPIPE
+        # de grep -m1 mataria a tac y el comando reportaria error tras imprimir
+        # la URL. -T evita la TTY que agregaria \r\n a la URL copiada.
+        if ! docker "${COMPOSE_ARGS[@]}" exec -T -u dev clis-code \
+            sh -c "tac /home/dev/.local/state/orca/serve.log | grep -m1 '^Pairing URL:'"; then
+            echo "Error: no hay pairing URL (¿clis-code corriendo? probá 'clis up -d')." >&2
+            exit 1
+        fi
+        exit 0
+        ;;
     up)
         shift
         UP_MODE=1
@@ -138,22 +149,30 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 if [[ "$UP_MODE" == "0" ]]; then
-    # --- Conservar la ubicación dentro de la raíz de proyectos compartida ---
+    # --- La sesión siempre abre en la ruta absoluta del host ---
     HOST_CWD="$(pwd -P)"
+    CONTAINER_WD="$HOST_CWD"
+    SESSION_MOUNTS=()
     case "$HOST_CWD" in
-        "$HOST_PROJECTS_ROOT")
-            RELATIVE_CWD=""
-            ;;
-        "$HOST_PROJECTS_ROOT"/*)
-            RELATIVE_CWD="${HOST_CWD#"$HOST_PROJECTS_ROOT"}"
-            ;;
+        # Bajo la raíz ya está cubierto por el mount del servicio persistente.
+        "$HOST_PROJECTS_ROOT"|"$HOST_PROJECTS_ROOT"/*) ;;
         *)
-            echo "Error: el directorio actual está fuera de $HOST_PROJECTS_ROOT" >&2
-            echo "Entrá a un repo bajo esa raíz o definí CLIS_PROJECTS_ROOT." >&2
-            exit 1
+            # Fuera de la raíz se monta solo el cwd en la misma ruta absoluta,
+            # así los paths coinciden con el host y los `docker run -v` internos
+            # los resuelve el daemon. Se rechazan rutas que taparían mounts o
+            # el filesystem del contenedor (/home taparía /home/dev, etc.).
+            for _protected in / /home/dev /etc /usr /opt /bin /sbin /lib /lib64 \
+                    /var /tmp /run /dev /proc /sys /root /boot /media /srv; do
+                if [[ "$HOST_CWD" == "$_protected" || "$HOST_CWD" == "$_protected"/* \
+                        || "$_protected" == "$HOST_CWD"/* ]]; then
+                    echo "Error: no se puede abrir una sesión desde $HOST_CWD" >&2
+                    echo "Montar ese directorio taparía rutas del contenedor ($_protected)." >&2
+                    exit 1
+                fi
+            done
+            SESSION_MOUNTS=(-v "$HOST_CWD:$HOST_CWD")
             ;;
     esac
-    CONTAINER_WD="$CONTAINER_PROJECTS_DIR$RELATIVE_CWD"
 
     RUN_ARGS=(
         run --rm --init -i
@@ -161,10 +180,16 @@ if [[ "$UP_MODE" == "0" ]]; then
         --volumes-from clis-code
         --network container:clis-tailscale
         -e CLIS_REMOTE_SERVICES=0
+        -e CLIS_PROJECTS_ROOT="$HOST_PROJECTS_ROOT"
         # El entrypoint arranca un ssh-agent interno en /tmp/clis-ssh-agent.sock
         # que carga las claves de /home/dev/.git-ssh (heredado vía --volumes-from).
         -e SSH_AUTH_SOCK=/tmp/clis-ssh-agent.sock
         -v "$HOST_SKILLS_DIR":/home/dev/.gemini/antigravity-cli/skills
+        # Las imágenes construidas con `docker compose build` heredan labels
+        # com.docker.compose.*; vaciar `project` evita que la sesión se cuente
+        # como contenedor del servicio y rompa `compose up` (strconv.Atoi).
+        --label com.docker.compose.project=
+        "${SESSION_MOUNTS[@]}"
         -w "$CONTAINER_WD"
     )
 

@@ -11,8 +11,8 @@ Moshi.
 - Lee `docs/README.md` para localizar la guia del subsistema que vas a cambiar.
 - Para red, procesos y volumenes, lee `docs/architecture.md` antes de editar
   `docker-compose.yml`, `entrypoint.sh` o `clis`.
-- Para Tailscale, Moshi o Herdr, consulta respectivamente `docs/tailscale.md`,
-  `docs/moshi.md` y `docs/agents-and-herdr.md`.
+- Para Tailscale, Moshi u Orca, consulta respectivamente `docs/tailscale.md`,
+  `docs/moshi.md` y `docs/agents-and-orca.md`.
 - No hay instrucciones anidadas ni contenido generado en el estado actual.
 
 ## Repository map
@@ -33,12 +33,16 @@ Moshi.
 - `clis-tailscale` ejecuta `tailscaled` y conserva identidad y socket en
   volumenes nombrados.
 - `clis-code` usa `network_mode: service:tailscale`; no tiene red propia.
-- El servicio persistente ejecuta SSH y Moshi Hook. Las sesiones `clis` usan
-  `CLIS_REMOTE_SERVICES=0` para evitar puertos y daemons duplicados.
+- El servicio persistente ejecuta SSH, Moshi Hook y `orca-ide serve`. Las
+  sesiones `clis` usan `CLIS_REMOTE_SERVICES=0` para evitar puertos y daemons
+  duplicados.
 - `/home/dev` se comparte mediante `~/.clis-code/home`; contiene credenciales,
-  hooks, `authorized_keys` y sockets de Herdr.
-- `/mnt/c/dev` se monta en `/home/dev/projects` por defecto. `clis` conserva la
-  ruta relativa del directorio desde el que se invoca.
+  hooks, `authorized_keys`, datos y sockets de Orca.
+- `/mnt/c/dev` se monta en `/home/dev/projects` y tambien en su propia ruta
+  absoluta del host (alias para `docker run -v` internos). `clis` abre la
+  sesion en la ruta absoluta del directorio desde el que se invoca; fuera de
+  la raiz solo se monta el cwd en esa misma ruta. `$CLIS_PROJECTS_ROOT` queda
+  exportada en el contenedor.
 - La imagen y algunas CLIs solo soportan `linux/amd64`.
 
 ## Environment and setup
@@ -49,8 +53,9 @@ Moshi.
 - Variables publicas: `.env.example`.
 - No leas, imprimas, edites ni agregues `.env`, tokens, credenciales o el
   contenido de `~/.clis-code/home`.
-- Un build consulta manifests remotos y puede resolver versiones nuevas aunque
-  el Dockerfile no cambie. Informa esa variabilidad al verificar.
+- Un build consulta manifests o paginas de release remotas y puede resolver
+  versiones nuevas aunque el Dockerfile no cambie. Informa esa variabilidad al
+  verificar.
 
 ## Commands
 
@@ -111,8 +116,11 @@ automatico. Marca esas verificaciones como no ejecutadas si no fueron pedidas.
   tailnet.
 - El healthcheck Tailscale debe exigir `BackendState=Running`; una IP asignada
   no prueba que el nodo este aprobado.
-- Herdr y Moshi tienen hooks distintos y compatibles; valida ambos despues de
+- Orca y Moshi tienen hooks distintos y compatibles; valida ambos despues de
   cambiar integraciones.
+- El pairing URL de Orca concede acceso al runtime y vive en
+  `/home/dev/.local/state/orca/serve.log`; no lo imprimas en la conversacion ni
+  lo incluyas en commits.
 
 ## Safety boundaries
 

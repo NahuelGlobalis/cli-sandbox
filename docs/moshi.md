@@ -92,8 +92,8 @@ docker compose restart clis-code
 No pegues el token en issues, logs o commits.
 
 Si `moshi-hook status` muestra `stale` o `not found`, reinstala con
-`moshi-hook install --target <agente>`. Devin todavia no es un target
-soportado por moshi-hook; sus sesiones se siguen por la integracion de Herdr.
+`moshi-hook install --target <agente>`. Devin no es un target de moshi-hook;
+su estado se consulta desde Orca o desde la propia CLI.
 
 ## Validar hooks y daemon
 
@@ -108,21 +108,20 @@ El estado esperado incluye:
 - `status: paired`
 - `codex current`
 - `opencode current`
-- `herdr` en la lista de multiplexores
 
 Tras instalar hooks, cierra las sesiones viejas de Codex/OpenCode y crea otras.
 Los hooks de inicio no aparecen retroactivamente en procesos existentes.
 
 ## PATH en sesiones remotas
 
-El servidor SSH define el PATH necesario para `herdr`, `codex`, `opencode`,
+El servidor SSH define el PATH necesario para `orca-ide`, `codex`, `opencode`,
 `agy` y `devin`. Despues de reconstruir o recrear `clis-code`, cierra por
 completo la conexion Moshi y vuelve a entrar.
 
 Solucion temporal para una sesion antigua:
 
 ```bash
-export PATH="/opt/herdr/bin:/home/dev/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
+export PATH="$HOME/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
 ```
 
 ## Sesiones tmux de Moshi
@@ -133,8 +132,9 @@ El comando siguiente crea o adjunta una sesion tmux asociada al directorio:
 moshi .
 ```
 
-Esto es distinto de una sesion Herdr. Consulta
-[Agentes y Herdr](agents-and-herdr.md) para compartir Herdr entre PC y telefono.
+Esto es distinto de una sesion de Orca. Consulta
+[Agentes y Orca](agents-and-orca.md) para conectar el cliente Orca al servidor
+del contenedor desde la PC o el telefono.
 
 ## Moshi Desktop en el host
 
@@ -166,26 +166,16 @@ Advertencia de seguridad: quien alcance `localhost:24544` en el host tiene
 control total sobre los agentes del contenedor. No expongas este puerto a la
 red; el bind a `127.0.0.1` ya lo previene.
 
-## Moshi Free y Herdr
+## Moshi Free y sesiones persistentes
 
-Moshi Free usa SSH y no incluye la integracion de multiplexores ni el
-auto-attach de Herdr. Si la app cierra la conexion, Herdr sigue ejecutando los
-agentes en el servidor, pero la conexion siguiente abre un shell nuevo. Para
-volver a la sesion persistente ejecuta:
+Moshi Free usa SSH y no incluye auto-attach ni el transporte Mosh. Si la app
+cierra la conexion, el servidor Orca y los procesos que lanzaste desde el
+cliente siguen vivos; la conexion SSH siguiente abre un shell nuevo. Para
+retomar el trabajo usá el cliente Orca, que se reconecta al servidor, o abrí una
+sesión tmux de Moshi.
 
-```bash
-herdr
-```
-
-O, para una sesion con nombre:
-
-```bash
-herdr session attach <nombre>
-```
-
-Esto no indica que Herdr haya perdido la sesion. Confirma que sigue viva con
-`herdr status server` y `herdr session list`. El auto-attach despues de una
-reconexion y el transporte Mosh son funciones de Moshi Pro. En Free, bloquear
-el telefono, suspender la app o cambiar entre Wi-Fi y datos puede cortar SSH y
-reiniciar todo el shell visible, no solo Herdr. Ejecuta cualquier trabajo que
-deba sobrevivir dentro de Herdr o tmux.
+El auto-attach despues de una reconexion y el transporte Mosh son funciones de
+Moshi Pro. En Free, bloquear el telefono, suspender la app o cambiar entre Wi-Fi
+y datos puede cortar SSH y reiniciar el shell visible. Ejecutá dentro de tmux
+cualquier trabajo de shell que deba sobrevivir; los agentes que corren dentro de
+Orca no dependen de esa conexión SSH.

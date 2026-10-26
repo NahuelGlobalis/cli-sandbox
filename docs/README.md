@@ -13,8 +13,8 @@ detalle la configuracion de WSL, Tailscale, Moshi y las sesiones compartidas.
 3. [Tailscale](tailscale.md): auth key, aprobacion, modos exit node, MagicDNS y
    exposicion de servicios al tailnet.
 4. [Moshi](moshi.md): Easy Pair, QR, SSH/Mosh, hooks y validacion.
-5. [Agentes y Herdr](agents-and-herdr.md): Codex, OpenCode, integraciones y
-   sesiones compartidas entre PC y celular.
+5. [Agentes y Orca](agents-and-orca.md): servidor remoto Orca, pairing,
+   proyectos y sesiones compartidas entre PC y celular.
 6. [Troubleshooting](troubleshooting.md): diagnostico de los errores mas
    frecuentes.
 
@@ -34,7 +34,7 @@ Despues:
 1. Aprobar `clis-code` en Tailscale Admin si el tailnet lo exige.
 2. Ejecutar Easy Pair desde el servicio persistente.
 3. Instalar los hooks de Moshi para Codex y OpenCode.
-4. Usar sesiones Herdr con nombre para adjuntarlas desde PC o celular.
+4. Conectar Orca Desktop o Mobile al servidor remoto del contenedor.
 
 ## Contextos de comandos
 

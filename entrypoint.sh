@@ -8,33 +8,6 @@ rsync -a --ignore-existing /home/dev-skel/ /home/dev/
 # Corregir ownership sin recorrer mounts anidados como projects o skills.
 find /home/dev -xdev -exec chown dev:dev {} + 2>/dev/null || true
 
-# Herdr: la config y las integraciones viven en el home persistente, que puede
-# ser anterior a la imagen. El skeleton solo popula un home vacío, así que
-# reconciliar aquí, de forma idempotente, lo que el build ya deja en la imagen.
-if command -v herdr >/dev/null 2>&1; then
-    HERDR_CFG="${HERDR_CONFIG_PATH:-/home/dev/.config/herdr/config.toml}"
-    HERDR_KEYS=/usr/local/share/clis-code/herdr-keys.toml
-    if [[ -f "$HERDR_KEYS" && -f "$HERDR_CFG" ]]; then
-        # flock evita un doble append si dos contenedores arrancan a la vez.
-        (
-            flock 9
-            if ! grep -q 'herdr-sidebar.open-sidebar' "$HERDR_CFG"; then
-                cat "$HERDR_KEYS" >> "$HERDR_CFG"
-            fi
-        ) 9>>"$HERDR_CFG"
-        chown dev:dev "$HERDR_CFG"
-    fi
-    # Solo el servicio persistente instala integraciones: las sesiones efímeras
-    # comparten el mismo home y no deben reescribirlas en paralelo.
-    if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
-        # Herdr exige que exista el directorio de config de cada CLI.
-        gosu dev mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config
-        for _cli in devin antigravity-cli opencode codex; do
-            gosu dev herdr integration install "$_cli" >/dev/null 2>&1 || true
-        done
-    fi
-fi
-
 # Generar claves de host SSH persistentes en el primer arranque. Se guardan
 # fuera de la imagen para que Moshi no vea una identidad distinta al recrear
 # el contenedor.
@@ -153,6 +126,36 @@ if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
         install -d -m 0755 -o dev -g dev /home/dev/.local/state/moshi-hook
         gosu dev moshi-hook serve \
             >>/home/dev/.local/state/moshi-hook/serve.log 2>&1 &
+    fi
+
+    # Orca Remote Server: mantiene terminales y sesiones de agentes en el
+    # servicio persistente. El pairing URL es un secreto y queda en el log.
+    # No se usa --supervise porque oculta el pairing URL cuando la salida no
+    # es una TTY; este bucle reinicia el servidor y conserva el enlace.
+    if [[ "${ORCA_SERVE_AUTOSTART:-1}" == "1" ]]; then
+        ORCA_STATE_DIR=/home/dev/.local/state/orca
+        ORCA_LOG="${ORCA_STATE_DIR}/serve.log"
+        install -d -m 0755 -o dev -g dev "${ORCA_STATE_DIR}"
+        touch "${ORCA_LOG}"
+        chown dev:dev "${ORCA_LOG}"
+        chmod 0600 "${ORCA_LOG}"
+        ORCA_PORT="${ORCA_PORT:-6768}"
+        ORCA_PAIRING_ADDRESS="${ORCA_PAIRING_ADDRESS:-${TAILSCALE_HOSTNAME:-clis-code}}"
+        ORCA_ARGS=(serve --port "${ORCA_PORT}" --pairing-address "${ORCA_PAIRING_ADDRESS}")
+        if [[ "${ORCA_MOBILE_PAIRING:-0}" == "1" ]]; then
+            ORCA_ARGS+=(--mobile-pairing)
+        fi
+        (
+            while true; do
+                printf '[%s] inicio orca-ide %s\n' \
+                    "$(date -u +%FT%TZ)" "${ORCA_ARGS[*]}" >>"${ORCA_LOG}"
+                gosu dev orca-ide "${ORCA_ARGS[@]}" >>"${ORCA_LOG}" 2>&1 || true
+                printf '[%s] orca-ide termino; reintento en 5s\n' \
+                    "$(date -u +%FT%TZ)" >>"${ORCA_LOG}"
+                sleep 5
+            done
+        ) &
+        echo "Orca serve iniciado en ${ORCA_PAIRING_ADDRESS}:${ORCA_PORT}; pairing en ${ORCA_LOG}" >&2
     fi
 fi
 

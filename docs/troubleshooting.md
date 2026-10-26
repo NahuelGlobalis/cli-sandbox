@@ -164,13 +164,13 @@ Comprueba la configuracion efectiva:
 ```bash
 docker compose exec clis-code sh -lc "sshd -T | grep '^setenv'"
 docker compose exec -u dev clis-code sh -lc \
-  "command -v herdr; command -v codex; command -v opencode"
+  "command -v orca-ide; command -v codex; command -v opencode"
 ```
 
 Solucion temporal dentro de la sesion remota:
 
 ```bash
-export PATH="/opt/herdr/bin:/home/dev/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
+export PATH="$HOME/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
 ```
 
 ## Codex u OpenCode no aparecen en Moshi
@@ -185,38 +185,33 @@ docker compose exec -u dev clis-code moshi-hook status
 El daemon debe estar `paired`, los hooks deben estar `current` y el log debe
 mostrar un WebSocket conectado. Crea sesiones nuevas de los agentes.
 
-## Herdr no aparece o no adjunta
+## Orca no aparece o no conecta
 
 ```bash
-docker compose exec -u dev clis-code herdr session list
-docker compose exec -u dev clis-code herdr status server
-docker compose exec -u dev clis-code herdr integration status
+docker compose exec -u dev clis-code orca-ide --version
+docker compose exec -u dev clis-code tail -n 120 \
+  /home/dev/.local/state/orca/serve.log
+docker compose exec clis-code curl -sS -o /dev/null -w '%{http_code}\n' \
+  http://127.0.0.1:6768
 docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
-Si el servidor vivia en un contenedor `clis-code-run-*` que ya termino, la
-sesion no puede recuperarse como proceso activo. Crea una nueva sesion con
-nombre y manten vivo el contenedor que aloja el servidor.
+Si el log no llega a `Orca server ready`, espera la descarga inicial del runtime
+(unos 150 MB en `/home/dev/.config/orca`) o revisa la salida de red. Si dice
+`Pairing URL: hidden`, el servidor se inicio con `--supervise`; el entrypoint no
+lo usa, asi que reinicia el servicio.
 
-Si `herdr status server` indica `running` pero una conexion nueva de Moshi abre
-un shell normal, la sesion no se perdio. Ejecuta `herdr` o
-`herdr session attach <nombre>` para volver a adjuntarla. Moshi Free no incluye
-el selector de multiplexores ni el auto-attach despues de reconectar; esas
-funciones requieren Pro.
+Si el cliente muestra **Disconnected**, confirma que ambos dispositivos estan en
+el mismo tailnet, que `clis-code:6768` responde y que las ACL permiten el
+trafico. Si reiniciaste Orca, el pairing URL cambio: volve a copiar el ultimo
+`Pairing URL:` del log. Los clientes ya emparejados conservan su acceso hasta
+revocarlo.
 
-Si tambien se reinicia el shell normal, comprueba primero `docker inspect
-clis-code --format '{{.RestartCount}}'`. Un valor `0` indica que el servidor no
-se reinicio: la conexion SSH del telefono se corto. En Moshi Free esto puede
-ocurrir al suspender la app o cambiar de red; Mosh, que conserva el transporte
-en esos casos, es una funcion Pro. Usa Herdr o tmux para que los procesos
-importantes sobrevivan y vuelve a adjuntar manualmente despues de reconectar.
+Si el log muestra que el puerto esta ocupado, elegi otro `ORCA_PORT` en `.env` y
+recrea el servicio. El pairing URL usa tambien el puerto nuevo.
 
-Si una integracion esta `outdated`:
-
-```bash
-herdr integration install codex
-herdr integration install opencode
-```
+Los terminales y agentes del servidor siguen vivos si el cliente Orca se
+desconecta. Al reconectar, el cliente recupera el workspace y sus terminales.
 
 ## --port no funciona con clis
 
