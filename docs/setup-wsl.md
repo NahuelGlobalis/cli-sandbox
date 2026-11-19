@@ -93,6 +93,7 @@ cd /mnt/c/dev/repos/mi-proyecto
 clis
 clis codex
 clis opencode
+clis claude
 clis herdr
 clis --env API_KEY=valor comando
 

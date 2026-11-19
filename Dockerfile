@@ -14,6 +14,7 @@ ARG UV_VERSION=0.11.24
 ARG PYTHON_VERSION=3.12
 ARG OPENCODE_VERSION=latest
 ARG CODEX_VERSION=latest
+ARG CLAUDE_VERSION=latest
 ARG NVIM_VERSION=0.12.6
 ARG TREE_SITTER_VERSION=0.27.1
 ARG LAZYGIT_VERSION=0.66.2
@@ -23,7 +24,7 @@ RUN test "${TARGETARCH}" = "amd64" \
     || (echo "Esta imagen solo admite linux/amd64" >&2 && exit 1)
 
 LABEL org.opencontainers.image.title="clis-code" \
-      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Antigravity, OpenCode, Codex, Herdr) + Chrome/Playwright + Docker CLI" \
+      org.opencontainers.image.description="CLIs de codificación asistida por IA (Devin, Claude, Antigravity, OpenCode, Codex, Herdr) + Chrome/Playwright + Docker CLI" \
       org.opencontainers.image.source="https://github.com/nahue/clis-code" \
       org.opencontainers.image.authors="nahue" \
       org.opencontainers.image.version="${IMAGE_VERSION}" \
@@ -137,9 +138,11 @@ RUN pnpm config set global-bin-dir /opt/pnpm-global/bin \
     && printf '%s\n' \
         'onlyBuiltDependencies:' \
         '  - "@opencode/cli"' \
+        '  - "@anthropic-ai/claude-code"' \
         '' \
         'allowBuilds:' \
         '  "@opencode/cli": true' \
+        '  "@anthropic-ai/claude-code": true' \
         > "$(pnpm root -g)/pnpm-workspace.yaml" \
     && ln -sf "$(pnpm root -g)/pnpm-workspace.yaml" /opt/pnpm-global/pnpm-workspace.yaml
 
@@ -184,6 +187,13 @@ RUN pnpm add -g "@opencode/cli@${OPENCODE_VERSION}" \
 ADD --chown=dev:dev https://registry.npmjs.org/@openai%2Fcodex/latest /tmp/codex-latest.json
 RUN pnpm add -g "@openai/codex@${CODEX_VERSION}" \
     && rm -f /tmp/codex-latest.json
+
+# Claude Code CLI de Anthropic. El postinstall baja el binario nativo, así que
+# el paquete debe estar en onlyBuiltDependencies del pnpm-workspace.yaml global.
+ADD --chown=dev:dev https://registry.npmjs.org/@anthropic-ai%2Fclaude-code/latest /tmp/claude-latest.json
+RUN pnpm add -g "@anthropic-ai/claude-code@${CLAUDE_VERSION}" \
+    && claude --version \
+    && rm -f /tmp/claude-latest.json
 
 # Herdr: el binario vive en /opt para que el volume persistente del home no lo oculte.
 # La configuración queda en /home/dev/.config/herdr y se conserva con el resto del home.
@@ -239,14 +249,15 @@ RUN herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar --yes \
 # exige que el directorio de config de cada CLI ya exista (normalmente lo crea
 # la CLI en su primer uso), así que se precrean aquí.
 RUN mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config \
-    && for cli in devin antigravity-cli opencode codex; do \
+        /home/dev/.claude \
+    && for cli in devin antigravity-cli opencode codex claude; do \
         herdr integration install "$cli" || echo "WARN: integration '$cli' no disponible"; \
     done
 
 # Hooks de Moshi para los eventos de los agentes (inicio/fin, notificaciones).
 # No requieren pairing durante la build; el token se agrega después con
 # `moshi-hook pair`. Devin aún no es un target soportado por moshi-hook.
-RUN moshi-hook install --target codex --target opencode
+RUN moshi-hook install --target claude --target codex --target opencode
 
 # Playwright global y navegador Chromium.
 RUN pnpm add -g "playwright@${PLAYWRIGHT_VERSION}" \
@@ -283,6 +294,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     && command -v agy \
     && command -v opencode \
     && command -v codex \
+    && command -v claude \
     && command -v herdr \
     && command -v moshi-hook \
     && command -v mosh-server \

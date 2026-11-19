@@ -28,8 +28,9 @@ if command -v herdr >/dev/null 2>&1; then
     # comparten el mismo home y no deben reescribirlas en paralelo.
     if [[ "${CLIS_REMOTE_SERVICES:-1}" == "1" ]]; then
         # Herdr exige que exista el directorio de config de cada CLI.
-        gosu dev mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config
-        for _cli in devin antigravity-cli opencode codex; do
+        gosu dev mkdir -p /home/dev/.config/devin /home/dev/.codex /home/dev/.gemini/config \
+            /home/dev/.claude
+        for _cli in devin antigravity-cli opencode codex claude; do
             gosu dev herdr integration install "$_cli" >/dev/null 2>&1 || true
         done
     fi

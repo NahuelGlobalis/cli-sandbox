@@ -164,7 +164,7 @@ Comprueba la configuracion efectiva:
 ```bash
 docker compose exec clis-code sh -lc "sshd -T | grep '^setenv'"
 docker compose exec -u dev clis-code sh -lc \
-  "command -v herdr; command -v codex; command -v opencode"
+  "command -v herdr; command -v claude; command -v codex; command -v opencode"
 ```
 
 Solucion temporal dentro de la sesion remota:
@@ -173,11 +173,11 @@ Solucion temporal dentro de la sesion remota:
 export PATH="/opt/herdr/bin:/home/dev/.local/bin:/opt/pnpm-global/bin:/opt/antigravity/bin:/opt/devin:$PATH"
 ```
 
-## Codex u OpenCode no aparecen en Moshi
+## Claude, Codex u OpenCode no aparecen en Moshi
 
 ```bash
 docker compose exec -u dev clis-code \
-  moshi-hook install --target codex --target opencode
+  moshi-hook install --target claude --target codex --target opencode
 docker compose restart clis-code
 docker compose exec -u dev clis-code moshi-hook status
 ```
@@ -214,6 +214,7 @@ importantes sobrevivan y vuelve a adjuntar manualmente despues de reconectar.
 Si una integracion esta `outdated`:
 
 ```bash
+herdr integration install claude
 herdr integration install codex
 herdr integration install opencode
 ```

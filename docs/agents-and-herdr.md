@@ -1,13 +1,13 @@
 # Agentes y Herdr
 
-## Hooks de Moshi para Codex y OpenCode
+## Hooks de Moshi para Claude, Codex y OpenCode
 
-La imagen instala los hooks de Codex y OpenCode durante el build. Para
+La imagen instala los hooks de Claude, Codex y OpenCode durante el build. Para
 actualizarlos o repararlos en el home persistente:
 
 ```bash
 docker compose exec -u dev clis-code \
-  moshi-hook install --target codex --target opencode
+  moshi-hook install --target claude --target codex --target opencode
 
 docker compose restart clis-code
 docker compose exec -u dev clis-code moshi-hook status
@@ -16,6 +16,7 @@ docker compose exec -u dev clis-code moshi-hook status
 El estado debe mostrar:
 
 ```text
+claude   current
 codex    current
 opencode current
 ```
@@ -29,6 +30,7 @@ Moshi detecta Herdr como multiplexor. Herdr, a su vez, necesita integraciones
 propias para conservar y mostrar el estado de los agentes:
 
 ```bash
+docker compose exec -u dev clis-code herdr integration install claude
 docker compose exec -u dev clis-code herdr integration install codex
 docker compose exec -u dev clis-code herdr integration install opencode
 docker compose exec -u dev clis-code herdr integration status

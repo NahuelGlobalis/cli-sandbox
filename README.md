@@ -1,4 +1,4 @@
-# Docker image para CLIs de codificación (Devin + Antigravity + OpenCode + Codex + Herdr) + Chrome/Playwright
+# Docker image para CLIs de codificación (Devin + Claude + Antigravity + OpenCode + Codex + Herdr) + Chrome/Playwright
 
 Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más populares, listo para usar sin riesgos en el sistema host. También incluye Google Chrome y Chromium para Playwright.
 
@@ -8,6 +8,7 @@ Contenedor Ubuntu 24.04 con las CLIs de codificación asistida por IA más popul
 - **Antigravity CLI** (`agy`) – Google
 - **OpenCode CLI** (`opencode`) – Anomaly
 - **Codex CLI** (`codex`) – OpenAI
+- **Claude Code CLI** (`claude`) – Anthropic
 - **Herdr** (`herdr`) – multiplexor de terminal para agentes
 - **Moshi Hook** (`moshi-hook`) – Easy Pair, notificaciones y vistas de agentes
 - **OpenSSH + Mosh + tmux** – acceso remoto y sesiones persistentes
@@ -115,7 +116,7 @@ comparten inmediatamente entre ambos.
 | Devin | `/opt/devin/` | Binario separado de credenciales |
 | Antigravity | `/opt/antigravity/bin/` | Binario fuera del volume |
 | Herdr | `/opt/herdr/bin/` | Binario fuera del volume; config en el home |
-| pnpm global | `/opt/pnpm-global/` | OpenCode, Playwright |
+| pnpm global | `/opt/pnpm-global/` | OpenCode, Codex, Claude, Playwright |
 | Playwright browsers | `/opt/playwright-browsers/` | Chromium |
 | Python (uv) | `/opt/uv/python/` | Interprete fuera del volume |
 | Neovim | `/opt/nvim-linux-x86_64/` | Binario fuera del volume; config en el home |
@@ -167,6 +168,14 @@ Tailscale del nodo) sin publicar puertos Docker. El servidor imprime una
 contraseña al arrancar; también puedes fijarla con
 `OPENCODE_SERVER_PASSWORD`.
 
+### Claude Code
+
+```bash
+claude
+```
+
+La primera ejecución inicia el login de Anthropic; en sesiones remotas muestra una URL para autenticar desde un navegador local.
+
 ## Usar Herdr
 
 Inicia Herdr desde cualquier proyecto:
@@ -190,6 +199,7 @@ Herdr detecta los agentes instalados. Las integraciones opcionales agregan
 estado y restauración de sesiones cuando el agente lo admite:
 
 ```bash
+herdr integration install claude
 herdr integration install codex
 herdr integration install devin
 herdr integration install opencode
@@ -397,6 +407,7 @@ clis devin
 clis agy
 clis opencode
 clis codex
+clis claude
 clis herdr
 
 # Ejecutar cualquier comando dentro del contenedor

@@ -84,7 +84,7 @@ docker compose exec -u dev clis-code \
   moshi-hook pair --token <token-de-moshi>
 
 docker compose exec -u dev clis-code \
-  moshi-hook install --target codex --target opencode
+  moshi-hook install --target claude --target codex --target opencode
 
 docker compose restart clis-code
 ```
@@ -106,18 +106,20 @@ docker compose exec -u dev clis-code moshi-hook logs
 El estado esperado incluye:
 
 - `status: paired`
+- `claude current`
 - `codex current`
 - `opencode current`
 - `herdr` en la lista de multiplexores
 
-Tras instalar hooks, cierra las sesiones viejas de Codex/OpenCode y crea otras.
-Los hooks de inicio no aparecen retroactivamente en procesos existentes.
+Tras instalar hooks, cierra las sesiones viejas de Claude/Codex/OpenCode y
+crea otras. Los hooks de inicio no aparecen retroactivamente en procesos
+existentes.
 
 ## PATH en sesiones remotas
 
-El servidor SSH define el PATH necesario para `herdr`, `codex`, `opencode`,
-`agy` y `devin`. Despues de reconstruir o recrear `clis-code`, cierra por
-completo la conexion Moshi y vuelve a entrar.
+El servidor SSH define el PATH necesario para `herdr`, `claude`, `codex`,
+`opencode`, `agy` y `devin`. Despues de reconstruir o recrear `clis-code`,
+cierra por completo la conexion Moshi y vuelve a entrar.
 
 Solucion temporal para una sesion antigua:
 
